@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/services.dart';
 
 enum LogLevel {
@@ -48,12 +49,12 @@ class FlutterPcmSound {
     return await _invokeMethod('clear');
   }
 
-  /// queue samples
+  /// queue 16-bit samples (little endian)
   static Future<void> feed(Uint8List buffer) async {
     return await _invokeMethod('feed', {'buffer': buffer});
   }
 
-  /// set the threshold at which we call the 
+  /// set the threshold at which we call the
   /// feed callback. i.e. if we have less than X
   /// queued samples, the feed callback will be invoked
   static Future<void> setFeedThreshold(int threshold) async {

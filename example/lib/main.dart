@@ -59,8 +59,8 @@ class _PcmSoundAppState extends State<PcmSoundApp> {
 
     for (int i = 0; i < totalFrames; i++) {
       final value = (math.sin(step * (i % nFramesPerPeriod)) * volume * 32767).toInt();
+      data[i * 2 + 0] = value & 0x00FF; // little endian
       data[i * 2 + 1] = (value & 0xFF00) >> 8;
-      data[i * 2 + 0] = value & 0x00FF;
     }
 
     return data;
@@ -104,6 +104,9 @@ class _PcmSoundAppState extends State<PcmSoundApp> {
               ElevatedButton(
                 onPressed: () {
                   FlutterPcmSound.clear();
+                  setState(() {
+                    remainingSamples = 0;
+                  });
                 },
                 child: Text('Clear'),
               ),

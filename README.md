@@ -71,7 +71,7 @@ await FlutterPcmSound.play();
 
 ## Other Useful Functions
 
-```
+```dart
 // suspend playback but does *not* clear queued samples
 await FlutterPcmSound.pause();
 
