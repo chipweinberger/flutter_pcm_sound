@@ -1,5 +1,8 @@
-
 #import "FlutterPcmSoundPlugin.h"
+#import <AudioToolbox/AudioToolbox.h>
+
+#define kOutputBus 0
+#define NAMESPACE @"flutter_pcm_sound" // Assuming this is the namespace you want
 
 typedef NS_ENUM(NSUInteger, LogLevel) {
     none = 0,
@@ -9,59 +12,212 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 };
 
 @interface FlutterPcmSoundPlugin ()
-@property(nonatomic, retain) NSObject<FlutterPluginRegistrar> *registrar;
-@property(nonatomic, retain) FlutterMethodChannel *methodChannel;
-@property(nonatomic) LogLevel logLevel;
+@property(nonatomic) NSObject<FlutterPluginRegistrar> *registrar;
+@property(nonatomic) FlutterMethodChannel *mMethodChannel;
+@property(nonatomic) LogLevel mLogLevel;
+@property(nonatomic) AudioComponentInstance mAudioUnit;
+@property(nonatomic) NSMutableData *mSamples;
+@property(nonatomic) int mNumChannels; 
+@property(nonatomic) int mFeedThreshold; 
+@property(nonatomic) bool invokeFeedCallback; 
 @end
 
 @implementation FlutterPcmSoundPlugin
+
 + (void)registerWithRegistrar:(NSObject<FlutterPluginRegistrar> *)registrar
 {
     FlutterMethodChannel *methodChannel = [FlutterMethodChannel methodChannelWithName:NAMESPACE @"/methods"
-                                                                binaryMessenger:[registrar messenger]];
+                                                                    binaryMessenger:[registrar messenger]];
+
     FlutterPcmSoundPlugin *instance = [[FlutterPcmSoundPlugin alloc] init];
-    instance.methodChannel = methodChannel;
-    instance.logLevel = standard;
+    instance.mMethodChannel = methodChannel;
+    instance.mLogLevel = standard;
+    instance.mSamples = [NSMutableData new];
+    instance.mFeedThreshold = 8000;
+    instance.invokeFeedCallback = true;
 
     [registrar addMethodCallDelegate:instance channel:methodChannel];
 }
-
-////////////////////////////////////////////////////////////
-// ██   ██   █████   ███    ██  ██████   ██       ███████    
-// ██   ██  ██   ██  ████   ██  ██   ██  ██       ██         
-// ███████  ███████  ██ ██  ██  ██   ██  ██       █████      
-// ██   ██  ██   ██  ██  ██ ██  ██   ██  ██       ██         
-// ██   ██  ██   ██  ██   ████  ██████   ███████  ███████                                                       
-//                                                      
-// ███    ███  ███████  ████████  ██   ██   ██████   ██████  
-// ████  ████  ██          ██     ██   ██  ██    ██  ██   ██ 
-// ██ ████ ██  █████       ██     ███████  ██    ██  ██   ██ 
-// ██  ██  ██  ██          ██     ██   ██  ██    ██  ██   ██ 
-// ██      ██  ███████     ██     ██   ██   ██████   ██████                                              
-//                                                      
-//  ██████   █████   ██       ██                           
-// ██       ██   ██  ██       ██                           
-// ██       ███████  ██       ██                           
-// ██       ██   ██  ██       ██                           
-//  ██████  ██   ██  ███████  ███████                     
 
 - (void)handleMethodCall:(FlutterMethodCall *)call result:(FlutterResult)result
 {
     @try
     {
-        if (_logLevel >= debug) {
-            NSLog(@"[FBP-iOS] handleMethodCall: %@", call.method);
+        if (self.mLogLevel >= verbose) {
+            NSLog(@"[PCM-iOS] handleMethodCall: %@", call.method);
         }
 
-        if([@"requestConnectionPriority" isEqualToString:call.method])
+        if ([@"setLogLevel" isEqualToString:call.method])
         {
-            result([FlutterError errorWithCode:@"requestConnectionPriority" 
-                                    message:@"android only"
-                                    details:NULL]);
+            NSDictionary *args = (NSDictionary*)call.arguments;
+            NSNumber *logLevelNumber  = args[@"log_level"];
+
+            self.mLogLevel = (LogLevel)[logLevelNumber integerValue];
+
+            result(@(true));
+        }
+        else if ([@"setup" isEqualToString:call.method])
+        {
+            NSDictionary *args = (NSDictionary*)call.arguments;
+            NSNumber *sampleRate  = args[@"sample_rate"];
+            NSNumber *numChannels = args[@"num_channels"];
+
+            self.mNumChannels = [numChannels intValue];
+
+            // create
+            AudioComponentDescription desc;
+            desc.componentType = kAudioUnitType_Output;
+            desc.componentSubType = kAudioUnitSubType_RemoteIO;
+            desc.componentFlags = 0;
+            desc.componentFlagsMask = 0;
+            desc.componentManufacturer = kAudioUnitManufacturer_Apple;
+
+            AudioComponent inputComponent = AudioComponentFindNext(NULL, &desc);
+            OSStatus status = AudioComponentInstanceNew(inputComponent, &_mAudioUnit);
+            if (status != noErr) {
+                NSString* message = [NSString stringWithFormat:@"AudioComponentInstanceNew failed. OSStatus: %@", @(status)];
+                result([FlutterError errorWithCode:@"AudioUnitError" message:message details:nil]);
+                return;
+            }
+
+            // set stream format
+            AudioStreamBasicDescription audioFormat;
+            audioFormat.mSampleRate = [sampleRate intValue];
+            audioFormat.mFormatID = kAudioFormatLinearPCM;
+            audioFormat.mFormatFlags = kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked;
+            audioFormat.mFramesPerPacket = 1;
+            audioFormat.mChannelsPerFrame = self.mNumChannels;
+            audioFormat.mBitsPerChannel = 16;
+            audioFormat.mBytesPerFrame = self.mNumChannels * (audioFormat.mBitsPerChannel / 8);
+            audioFormat.mBytesPerPacket = audioFormat.mBytesPerFrame * audioFormat.mFramesPerPacket;
+
+            status = AudioUnitSetProperty(_mAudioUnit,
+                                    kAudioUnitProperty_StreamFormat,
+                                    kAudioUnitScope_Input,
+                                    kOutputBus,
+                                    &audioFormat,
+                                    sizeof(audioFormat));
+            if (status != noErr) {
+                NSString* message = [NSString stringWithFormat:@"AudioUnitSetProperty StreamFormat failed. OSStatus: %@", @(status)];
+                result([FlutterError errorWithCode:@"AudioUnitError" message:@"Failed to set stream format" details:nil]);
+                return;
+            }
+
+            // set callback
+            AURenderCallbackStruct callback;
+            callback.inputProc = RenderCallback;
+            callback.inputProcRefCon = (__bridge void *)(self);
+
+            status = AudioUnitSetProperty(_mAudioUnit,
+                                kAudioUnitProperty_SetRenderCallback,
+                                kAudioUnitScope_Global,
+                                kOutputBus,
+                                &callback,
+                                sizeof(callback));
+            if (status != noErr) {
+                NSString* message = [NSString stringWithFormat:@"AudioUnitSetProperty SetRenderCallback failed. OSStatus: %@", @(status)];
+                result([FlutterError errorWithCode:@"AudioUnitError" message:message details:nil]);
+                return;
+            }
+
+            // initialize
+            status = AudioUnitInitialize(_mAudioUnit);
+            if (status != noErr) {
+                NSString* message = [NSString stringWithFormat:@"AudioUnitInitialize failed. OSStatus: %@", @(status)];
+                result([FlutterError errorWithCode:@"AudioUnitError" message:message details:nil]);
+                return;
+            }
+            
+            result(@(true));
+        }
+        else if ([@"play" isEqualToString:call.method])
+        {
+            self.invokeFeedCallback = true;
+
+            OSStatus status = AudioOutputUnitStart(_mAudioUnit);
+            if (status != noErr) {
+                NSString* message = [NSString stringWithFormat:@"AudioOutputUnitStart failed. OSStatus: %@", @(status)];
+                result([FlutterError errorWithCode:@"AudioUnitError" message:message details:nil]);
+                return;
+            }
+
+            result(@(true));
+        }
+        else if ([@"pause" isEqualToString:call.method])
+        {
+            OSStatus status = AudioOutputUnitStop(_mAudioUnit);
+            if (status != noErr) {
+                NSString* message = [NSString stringWithFormat:@"AudioOutputUnitStop failed. OSStatus: %@", @(status)];
+                result([FlutterError errorWithCode:@"AudioUnitError" message:message details:nil]);
+                return;
+            }
+
+            result(@(true));
+        }
+        else if ([@"stop" isEqualToString:call.method])
+        {
+            OSStatus status = AudioOutputUnitStop(_mAudioUnit);
+            if (status != noErr) {
+                NSString* message = [NSString stringWithFormat:@"AudioOutputUnitStop failed. OSStatus: %@", @(status)];
+                result([FlutterError errorWithCode:@"AudioUnitError" message:message details:nil]);
+                return;
+            }
+
+            @synchronized (self.mSamples) {
+                [self.mSamples setLength:0];
+            }
+            result(@(true));
+        }
+        else if ([@"clear" isEqualToString:call.method])
+        {
+            @synchronized (self.mSamples) {
+                [self.mSamples setLength:0];
+            }
+            result(@(true));
+        }
+        else if ([@"feed" isEqualToString:call.method])
+        {
+            NSDictionary *args = (NSDictionary*)call.arguments;
+            NSData *buffer = args[@"buffer"];
+
+            @synchronized (self.mSamples) {
+                [self.mSamples appendData:buffer];
+                self.invokeFeedCallback = true;
+            }
+
+            result(@(true));
+        }
+        else if ([@"setFeedThreshold" isEqualToString:call.method])
+        {
+            NSDictionary *args = (NSDictionary*)call.arguments;
+            NSNumber *feedThreshold = args[@"feed_threshold"];
+
+            self.mFeedThreshold = [feedThreshold intValue];
+
+            result(@(true));
+        }
+        else if([@"getPendingSamplesCount" isEqualToString:call.method])
+        {
+            NSUInteger count = 0;
+            @synchronized (self.mSamples) {
+                count = [self.mSamples length] / (self.mNumChannels * sizeof(short));
+            }
+            result(@(count));
+        }
+        else if([@"release" isEqualToString:call.method])
+        {
+            AudioUnitUninitialize(_mAudioUnit);
+            AudioComponentInstanceDispose(_mAudioUnit);
+            _mAudioUnit = nil;
+            @synchronized (self.mSamples) {
+                self.mSamples = [NSMutableData new]; 
+            }
+            self.mNumChannels = 0;
+            result(@(true));
         }
         else
         {
-            result(FlutterMethodNotImplemented);
+            result([FlutterError errorWithCode:@"functionNotImplemented" message:call.method details:nil]);
         }
     }
     @catch (NSException *e)
@@ -71,3 +227,49 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
         result([FlutterError errorWithCode:@"iosException" message:[e reason] details:details]);
     }
 }
+
+
+
+static OSStatus RenderCallback(void *inRefCon,
+                               AudioUnitRenderActionFlags *ioActionFlags,
+                               const AudioTimeStamp *inTimeStamp,
+                               UInt32 inBusNumber,
+                               UInt32 inNumberFrames,
+                               AudioBufferList *ioData)
+{
+    FlutterPcmSoundPlugin *instance = (__bridge FlutterPcmSoundPlugin *)(inRefCon);
+
+    NSUInteger remainingSamples;
+    BOOL shouldRequestMore = false;
+
+    @synchronized (instance.mSamples) {
+
+        NSUInteger bytesToCopy = MIN(ioData->mBuffers[0].mDataByteSize, [instance.mSamples length]);
+        
+        // provide samples
+        memcpy(ioData->mBuffers[0].mData, [instance.mSamples bytes], bytesToCopy);
+
+        // pop front bytes
+        NSRange range = NSMakeRange(0, bytesToCopy);
+        [instance.mSamples replaceBytesInRange:range withBytes:NULL length:0];
+
+        remainingSamples = [instance.mSamples length] / (instance.mNumChannels * sizeof(short));
+
+        if (remainingSamples < instance.mNumChannels * instance.mFeedThreshold) { 
+            if (instance.invokeFeedCallback) {
+                shouldRequestMore = true;
+                instance.invokeFeedCallback = false;
+            }
+        }
+    }
+
+    if (shouldRequestMore) { 
+        NSDictionary *response = @{@"remaining_samples": @(remainingSamples)};
+        [instance.mMethodChannel invokeMethod:@"OnFeedSamples" arguments:response];
+    }
+
+    return noErr;
+}
+
+
+@end
