@@ -1,59 +1,74 @@
-
 import 'dart:async';
 import 'package:flutter/services.dart';
+
+enum LogLevel {
+  none,
+  error,
+  standard,
+  verbose,
+}
 
 class FlutterPcmSound {
   static const MethodChannel _channel = const MethodChannel('flutter_pcm_sound/methods');
 
-  Future<bool> setLogLevel(int level) async {
+  static LogLevel _logLevel = LogLevel.standard;
+
+  static Future<void> setLogLevel(int level) async {
     return await _channel.invokeMethod('setLogLevel', {'log_level': level});
   }
 
-  Future<bool> setup(int sampleRate, int numChannels) async {
+  static Future<void> setup(int sampleRate, int numChannels) async {
     return await _channel.invokeMethod('setup', {
       'sample_rate': sampleRate,
       'num_channels': numChannels,
     });
   }
 
-  Future<bool> play() async {
+  static Future<void> play() async {
     return await _channel.invokeMethod('play');
   }
 
-  Future<bool> pause() async {
+  static Future<void> pause() async {
     return await _channel.invokeMethod('pause');
   }
 
-  Future<bool> stop() async {
+  static Future<void> stop() async {
     return await _channel.invokeMethod('stop');
   }
 
-  Future<bool> clear() async {
+  static Future<void> clear() async {
     return await _channel.invokeMethod('clear');
   }
 
-  Future<bool> feed(List<int> buffer) async {
+  static Future<void> feed(Uint8List buffer) async {
     return await _channel.invokeMethod('feed', {'buffer': buffer});
   }
 
-  Future<bool> setFeedThreshold(int threshold) async {
+  static Future<void> setFeedThreshold(int threshold) async {
     return await _channel.invokeMethod('setFeedThreshold', {'feed_threshold': threshold});
   }
 
-  Future<int> getPendingSamplesCount() async {
+  static Future<void> getPendingSamplesCount() async {
     return await _channel.invokeMethod('getPendingSamplesCount');
   }
 
-  Future<bool> release() async {
+  static Future<void> release() async {
     return await _channel.invokeMethod('release');
   }
+  
 
   // This listens to the 'OnFeedSamples' event from the native side and triggers a callback
-  void setOnFeedSamplesCallback(Function(dynamic response) callback) {
+  static void setOnFeedSamplesCallback(Function(int) callback) {
     _channel.setMethodCallHandler((MethodCall call) async {
+      if (_logLevel.index >= LogLevel.standard.index) {
+        String func = '[[ ${call.method} ]]';
+        String result = call.arguments.toString();
+        print("[PCM] $func result: $result");
+      }
       switch (call.method) {
         case 'OnFeedSamples':
-          callback(call.arguments);
+          int remainingSamples = call.arguments["remaining_samples"];
+          callback(remainingSamples);
           break;
         default:
           print('Method not implemented');

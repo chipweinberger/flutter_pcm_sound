@@ -31,7 +31,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 
     FlutterPcmSoundPlugin *instance = [[FlutterPcmSoundPlugin alloc] init];
     instance.mMethodChannel = methodChannel;
-    instance.mLogLevel = standard;
+    instance.mLogLevel = verbose;
     instance.mSamples = [NSMutableData new];
     instance.mFeedThreshold = 8000;
     instance.invokeFeedCallback = true;
@@ -67,7 +67,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
             // create
             AudioComponentDescription desc;
             desc.componentType = kAudioUnitType_Output;
-            desc.componentSubType = kAudioUnitSubType_RemoteIO;
+            desc.componentSubType = kAudioUnitSubType_DefaultOutput;
             desc.componentFlags = 0;
             desc.componentFlagsMask = 0;
             desc.componentManufacturer = kAudioUnitManufacturer_Apple;
@@ -99,7 +99,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
                                     sizeof(audioFormat));
             if (status != noErr) {
                 NSString* message = [NSString stringWithFormat:@"AudioUnitSetProperty StreamFormat failed. OSStatus: %@", @(status)];
-                result([FlutterError errorWithCode:@"AudioUnitError" message:@"Failed to set stream format" details:nil]);
+                result([FlutterError errorWithCode:@"AudioUnitError" message:message details:nil]);
                 return;
             }
 
@@ -178,10 +178,10 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
         else if ([@"feed" isEqualToString:call.method])
         {
             NSDictionary *args = (NSDictionary*)call.arguments;
-            NSData *buffer = args[@"buffer"];
+            FlutterStandardTypedData *buffer = args[@"buffer"];
 
             @synchronized (self.mSamples) {
-                [self.mSamples appendData:buffer];
+                [self.mSamples appendData:buffer.data];
                 self.invokeFeedCallback = true;
             }
 
@@ -265,7 +265,9 @@ static OSStatus RenderCallback(void *inRefCon,
 
     if (shouldRequestMore) { 
         NSDictionary *response = @{@"remaining_samples": @(remainingSamples)};
-        [instance.mMethodChannel invokeMethod:@"OnFeedSamples" arguments:response];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [instance.mMethodChannel invokeMethod:@"OnFeedSamples" arguments:response];
+        });
     }
 
     return noErr;
