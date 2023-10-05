@@ -1,0 +1,8 @@
+.DS_Store
+.vscode
+.dart_tool/
+pubspec.lock
+example/*
+!example/lib/
+!example/lib/main.dart
+!example/pubspec.yaml

@@ -1,0 +1,19 @@
+group 'flutter_pcm_sound'
+version '1.0'
+
+apply plugin: 'com.android.library'
+
+android {
+    compileSdkVersion 33
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    defaultConfig {
+        minSdkVersion 21
+    }
+
+    namespace 'flutter_pcm_sound'
+}
