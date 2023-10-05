@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 
-
 import 'package:flutter/material.dart';
 import 'package:flutter_pcm_sound/flutter_pcm_sound.dart';
 
@@ -25,6 +24,7 @@ class PcmSoundApp extends StatefulWidget {
 }
 
 class _PcmSoundAppState extends State<PcmSoundApp> {
+  int fed = 0;
   int remainingSamples = 0;
 
   @override
@@ -43,19 +43,20 @@ class _PcmSoundAppState extends State<PcmSoundApp> {
   void onFeed(int remainingSamples) async {
     this.remainingSamples = remainingSamples;
     setState(() {});
-    int step = (DateTime.now().millisecondsSinceEpoch ~/ 500) % 14;
+    int step = (fed ~/ (sampleRate / 2)) % 14;
     int freq = 200 + (step < 7 ? 50 * step : 300 - (step - 7) * 50);
-    final frame = sineWave(periods: 20, sampleRate: sampleRate, freq: freq);
-    await FlutterPcmSound.feed(frame);
+    List<int> frame = sineWave(periods: 20, sampleRate: sampleRate, freq: freq);
+    await FlutterPcmSound.feed(PcmArrayInt16.fromList(frame));
+    fed += frame.length;
   }
 
-  PcmArrayInt16 sineWave({int periods = 1, int sampleRate = 44100, int freq = 440, double volume = 0.5}) {
+  List<int> sineWave({int periods = 1, int sampleRate = 44100, int freq = 440, double volume = 0.5}) {
     final period = 1.0 / freq;
     final nFramesPerPeriod = (period * sampleRate).toInt();
     final totalFrames = nFramesPerPeriod * periods;
     final step = math.pi * 2 / nFramesPerPeriod;
 
-    PcmArrayInt16 data = PcmArrayInt16.zeros(count: totalFrames);
+    List<int> data = List.filled(totalFrames, 0);
 
     for (int i = 0; i < totalFrames; i++) {
       data[i] = (math.sin(step * (i % nFramesPerPeriod)) * volume * 32767).toInt();
@@ -94,6 +95,7 @@ class _PcmSoundAppState extends State<PcmSoundApp> {
                 onPressed: () {
                   FlutterPcmSound.stop();
                   setState(() {
+                    fed = 0;
                     remainingSamples = 0;
                   });
                 },
