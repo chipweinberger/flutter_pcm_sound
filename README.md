@@ -14,10 +14,16 @@ FlutterPcmSound has zero dependencies besides Flutter, Android, iOS, and MacOS t
 
 Please star this repo & on [pub.dev](https://pub.dev/packages/flutter_pcm_sound). We all benefit from having a larger community.
 
+## Callback Based
+
+FlutterPcmSound uses a callback `setFeedCallback` so you know when to feed more samples.
+
+You can also manually `feed` whenever or use `remainingSamples`.
+
 ## Example App
 
 ```
-# enable the platforms you need
+# enable platforms you need
 cd ./example
 flutter config --enable-web                           
 flutter config --enable-macos-desktop                                                      
@@ -33,19 +39,51 @@ flutter run
 
 ## Usage
 
-### Set Log Level
-
 ```dart
-// if your terminal doesn't support color you'll see annoying logs like `\x1B[1;35m`
-FlutterPcmSound.setLogLevel(LogLevel.verbose, color:false)
+// for testing purposes
+List<int> sineWave({int periods = 1, int sampleRate = 44100, int freq = 440, double volume = 0.5}) {
+    final period = 1.0 / freq;
+    final nFramesPerPeriod = (period * sampleRate).toInt();
+    final totalFrames = nFramesPerPeriod * periods;
+    final step = math.pi * 2 / nFramesPerPeriod;
+    List<int> data = List<int>.filled(totalFrames * 2, 0);
+    for (int i = 0; i < totalFrames; i++) {
+        final value = (math.sin(step * (i % nFramesPerPeriod)) * volume * 32767).toInt();
+        data[i * 2 + 1] = (value & 0xFF00) >> 8;
+        data[i * 2 + 0] = value & 0x00FF;
+    }
+    return data;
+}
+
+// invoked whenever we need to feed more samples to the platform
+void onFeed(int remainingSamples) async {
+    int step = (DateTime.now().millisecondsSinceEpoch ~/ 500) % 14;
+    int freq = 200 + (step < 7 ? 50 * step : 300 - (step - 7) * 50);
+    final frame = sineWave(periods: 20, sampleRate: sampleRate, freq: freq);
+    await FlutterPcmSound.feed(Uint8List.fromList(frame));
+}
+
+await FlutterPcmSound.setup(sampleRate: 44100, channelCount: 1);
+await FlutterPcmSound.setFeedThreshold(8000); // feed when below 8000 queued samples
+await FlutterPcmSound.setFeedCallback(onFeed);
+await FlutterPcmSound.play();
 ```
 
-**Verbose Logs:**
+## Other Useful Functions
 
-⚫ = function name
+```
+// suspend playback but does *not* clear queued samples
+await FlutterPcmSound.pause();
 
-🟣 = args to platform
+// clears all queued samples
+await FlutterPcmSound.clear();
 
-🟡 = data from platform
+// suspend playback & clear queued samples
+await FlutterPcmSound.stop();
+
+// get the current number of queued samples
+int samples = await FlutterPcmSound.remainingSamples();
+```
+
 
 

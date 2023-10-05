@@ -15,41 +15,64 @@ class FlutterPcmSound {
 
   static LogLevel _logLevel = LogLevel.standard;
 
+  /// set log level
   static Future<void> setLogLevel(int level) async {
     return await _invokeMethod('setLogLevel', {'log_level': level});
   }
 
-  static Future<void> setup(int sampleRate, int numChannels) async {
+  /// setup audio
+  static Future<void> setup({required int sampleRate, required int channelCount}) async {
     return await _invokeMethod('setup', {
       'sample_rate': sampleRate,
-      'num_channels': numChannels,
+      'num_channels': channelCount,
     });
   }
 
+  /// start playback
   static Future<void> play() async {
     return await _invokeMethod('play');
   }
 
+  /// suspend playback, but does *not* clear queued samples
   static Future<void> pause() async {
     return await _invokeMethod('pause');
   }
 
+  /// suspend playback & clear queued samples
   static Future<void> stop() async {
     return await _invokeMethod('stop');
   }
 
+  /// clear queued samples
   static Future<void> clear() async {
     return await _invokeMethod('clear');
   }
 
+  /// queue samples
   static Future<void> feed(Uint8List buffer) async {
     return await _invokeMethod('feed', {'buffer': buffer});
   }
 
+  /// set the threshold at which we call the 
+  /// feed callback. i.e. if we have less than X
+  /// queued samples, the feed callback will be invoked
   static Future<void> setFeedThreshold(int threshold) async {
     return await _invokeMethod('setFeedThreshold', {'feed_threshold': threshold});
   }
 
+  /// callback is invoked when the audio buffer
+  /// is in danger of running out of queued samples
+  static void setFeedCallback(Function(int) callback) {
+    onFeedSamplesCallback = callback;
+    _channel.setMethodCallHandler(_methodCallHandler);
+  }
+
+  /// get the number of queued samples remaining
+  static Future<int> remainingSamples() async {
+    return await _invokeMethod('remainingSamples');
+  }
+
+  /// release all audio resources
   static Future<void> release() async {
     return await _invokeMethod('release');
   }
@@ -60,9 +83,9 @@ class FlutterPcmSound {
       if (method == 'feed') {
         Uint8List data = arguments['buffer'];
         if (data.lengthInBytes > 6) {
-          args = '(${data.lengthInBytes~/2} samples) ${data.sublist(0, 6)} ...';
+          args = '(${data.lengthInBytes ~/ 2} samples) ${data.sublist(0, 6)} ...';
         } else {
-          args = '(${data.lengthInBytes~/2} samples) $data';
+          args = '(${data.lengthInBytes ~/ 2} samples) $data';
         }
       } else if (arguments != null) {
         args = arguments.toString();
@@ -88,11 +111,5 @@ class FlutterPcmSound {
       default:
         print('Method not implemented');
     }
-  }
-
-  // This listens to the 'OnFeedSamples' event from the native side and triggers a callback
-  static void setFeedCallback(Function(int) callback) {
-    onFeedSamplesCallback = callback;
-    _channel.setMethodCallHandler(_methodCallHandler);
   }
 }

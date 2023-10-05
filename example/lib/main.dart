@@ -30,7 +30,7 @@ class _PcmSoundAppState extends State<PcmSoundApp> {
   @override
   void initState() {
     super.initState();
-    FlutterPcmSound.setup(sampleRate, 1);
+    FlutterPcmSound.setup(sampleRate: sampleRate, channelCount: 1);
     FlutterPcmSound.setFeedThreshold(8000);
     FlutterPcmSound.setFeedCallback(onFeed);
   }

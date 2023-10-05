@@ -208,6 +208,14 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 
             result(@(true));
         }
+        else if ([@"remainingSamples" isEqualToString:call.method])
+        {
+            NSUInteger count = 0;
+            @synchronized (self.mSamples) {
+                count = [self.mSamples length] / (self.mNumChannels * sizeof(short));
+            }
+            result(@(count));
+        }
         else if([@"release" isEqualToString:call.method])
         {
             if (_mAudioUnit != nil) {
