@@ -25,33 +25,31 @@ class PcmSoundApp extends StatefulWidget {
 }
 
 class _PcmSoundAppState extends State<PcmSoundApp> {
+  int remainingSamples = 0;
+
   @override
   void initState() {
     super.initState();
     FlutterPcmSound.setup(sampleRate, 1);
-    FlutterPcmSound.setOnFeedSamplesCallback(onFeedSamples);
+    FlutterPcmSound.setFeedThreshold(8000);
+    FlutterPcmSound.setFeedCallback(onFeed);
   }
 
   @override
   void dispose() {
-    FlutterPcmSound.release();
     super.dispose();
   }
 
-  void onFeedSamples(int remainingSamples) async {
-    final frame = sineWave(periods: 20, sampleRate: sampleRate);
+  void onFeed(int remainingSamples) async {
+    this.remainingSamples = remainingSamples;
+    setState(() {});
+    int step = (DateTime.now().millisecondsSinceEpoch ~/ 500) % 14;
+    int freq = 200 + (step < 7 ? 50 * step : 300 - (step - 7) * 50);
+    final frame = sineWave(periods: 20, sampleRate: sampleRate, freq: freq);
     await FlutterPcmSound.feed(Uint8List.fromList(frame));
   }
 
-  Future<void> _play() async {
-    await FlutterPcmSound.play();
-  }
-
-  Future<void> _pause() async {
-    await FlutterPcmSound.pause();
-  }
-
-  List<int> sineWave({int periods = 1, int sampleRate = 44100, double freq = 440, double volume = 0.5}) {
+  List<int> sineWave({int periods = 1, int sampleRate = 44100, int freq = 440, double volume = 0.5}) {
     final period = 1.0 / freq;
     final nFramesPerPeriod = (period * sampleRate).toInt();
     final totalFrames = nFramesPerPeriod * periods;
@@ -71,31 +69,47 @@ class _PcmSoundAppState extends State<PcmSoundApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       theme: ThemeData(
-        primarySwatch: Colors.grey,
+        primarySwatch: Colors.blue,
       ),
       home: Scaffold(
         appBar: AppBar(
           centerTitle: true,
           title: Text('Flutter PCM Sound'),
         ),
-        body: Column(
-          children: [
-            Card(
-              child: Row(
-                children: [
-                  TextButton(
-                    onPressed: _play,
-                    child: Text('Play'),
-                  ),
-                  TextButton(
-                    onPressed: _pause,
-                    child: Text('Pause'),
-                  ),
-                  Text('Test PCM Playback'),
-                ],
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              ElevatedButton(
+                onPressed: () {
+                  FlutterPcmSound.play();
+                },
+                child: Text('Play'),
               ),
-            ),
-          ],
+              ElevatedButton(
+                onPressed: () {
+                  FlutterPcmSound.pause();
+                },
+                child: Text('Pause'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  FlutterPcmSound.stop();
+                  setState(() {
+                    remainingSamples = 0;
+                  });
+                },
+                child: Text('Stop'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  FlutterPcmSound.clear();
+                },
+                child: Text('Clear'),
+              ),
+              Text('$remainingSamples Remaining Samples')
+            ],
+          ),
         ),
       ),
     );

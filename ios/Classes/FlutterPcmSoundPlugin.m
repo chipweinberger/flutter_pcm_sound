@@ -43,10 +43,6 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 {
     @try
     {
-        if (self.mLogLevel >= verbose) {
-            NSLog(@"[PCM-iOS] handleMethodCall: %@", call.method);
-        }
-
         if ([@"setLogLevel" isEqualToString:call.method])
         {
             NSDictionary *args = (NSDictionary*)call.arguments;
@@ -63,6 +59,18 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
             NSNumber *numChannels = args[@"num_channels"];
 
             self.mNumChannels = [numChannels intValue];
+
+            // reset
+            @synchronized (self.mSamples) {
+                self.mSamples = [NSMutableData new]; 
+            }
+
+            // destroy
+            if (_mAudioUnit != nil) {
+                AudioUnitUninitialize(_mAudioUnit);
+                AudioComponentInstanceDispose(_mAudioUnit);
+                _mAudioUnit = nil;
+            }
 
             // create
             AudioComponentDescription desc;
@@ -196,23 +204,16 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 
             result(@(true));
         }
-        else if([@"getPendingSamplesCount" isEqualToString:call.method])
-        {
-            NSUInteger count = 0;
-            @synchronized (self.mSamples) {
-                count = [self.mSamples length] / (self.mNumChannels * sizeof(short));
-            }
-            result(@(count));
-        }
         else if([@"release" isEqualToString:call.method])
         {
-            AudioUnitUninitialize(_mAudioUnit);
-            AudioComponentInstanceDispose(_mAudioUnit);
-            _mAudioUnit = nil;
+            if (_mAudioUnit != nil) {
+                AudioUnitUninitialize(_mAudioUnit);
+                AudioComponentInstanceDispose(_mAudioUnit);
+                _mAudioUnit = nil;
+            }
             @synchronized (self.mSamples) {
                 self.mSamples = [NSMutableData new]; 
             }
-            self.mNumChannels = 0;
             result(@(true));
         }
         else
