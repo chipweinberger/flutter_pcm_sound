@@ -1,5 +1,5 @@
 import 'dart:math' as math;
-import 'dart:typed_data';
+
 
 import 'package:flutter/material.dart';
 import 'package:flutter_pcm_sound/flutter_pcm_sound.dart';
@@ -46,21 +46,19 @@ class _PcmSoundAppState extends State<PcmSoundApp> {
     int step = (DateTime.now().millisecondsSinceEpoch ~/ 500) % 14;
     int freq = 200 + (step < 7 ? 50 * step : 300 - (step - 7) * 50);
     final frame = sineWave(periods: 20, sampleRate: sampleRate, freq: freq);
-    await FlutterPcmSound.feed(Uint8List.fromList(frame));
+    await FlutterPcmSound.feed(frame);
   }
 
-  List<int> sineWave({int periods = 1, int sampleRate = 44100, int freq = 440, double volume = 0.5}) {
+  PcmArrayInt16 sineWave({int periods = 1, int sampleRate = 44100, int freq = 440, double volume = 0.5}) {
     final period = 1.0 / freq;
     final nFramesPerPeriod = (period * sampleRate).toInt();
     final totalFrames = nFramesPerPeriod * periods;
     final step = math.pi * 2 / nFramesPerPeriod;
 
-    List<int> data = List<int>.filled(totalFrames * 2, 0);
+    PcmArrayInt16 data = PcmArrayInt16.zeros(count: totalFrames);
 
     for (int i = 0; i < totalFrames; i++) {
-      final value = (math.sin(step * (i % nFramesPerPeriod)) * volume * 32767).toInt();
-      data[i * 2 + 0] = value & 0x00FF; // little endian
-      data[i * 2 + 1] = (value & 0xFF00) >> 8;
+      data[i] = (math.sin(step * (i % nFramesPerPeriod)) * volume * 32767).toInt();
     }
 
     return data;

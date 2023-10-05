@@ -42,26 +42,24 @@ flutter run
 
 ```dart
 // for testing purposes
-List<int> sineWave({int periods = 1, int sampleRate = 44100, int freq = 440, double volume = 0.5}) {
+  PcmArrayInt16 sineWave({int periods = 1, int sampleRate = 44100, int freq = 440, double volume = 0.5}) {
     final period = 1.0 / freq;
     final nFramesPerPeriod = (period * sampleRate).toInt();
     final totalFrames = nFramesPerPeriod * periods;
     final step = math.pi * 2 / nFramesPerPeriod;
-    List<int> data = List<int>.filled(totalFrames * 2, 0);
+    PcmArrayInt16 data = PcmArrayInt16.zeros(count: totalFrames);
     for (int i = 0; i < totalFrames; i++) {
-        final value = (math.sin(step * (i % nFramesPerPeriod)) * volume * 32767).toInt();
-        data[i * 2 + 1] = (value & 0xFF00) >> 8;
-        data[i * 2 + 0] = value & 0x00FF;
+      data[i] = (math.sin(step * (i % nFramesPerPeriod)) * volume * 32767).toInt();
     }
     return data;
-}
+  }
 
 // invoked whenever we need to feed more samples to the platform
 void onFeed(int remainingSamples) async {
     int step = (DateTime.now().millisecondsSinceEpoch ~/ 500) % 14;
     int freq = 200 + (step < 7 ? 50 * step : 300 - (step - 7) * 50);
-    final frame = sineWave(periods: 20, sampleRate: sampleRate, freq: freq);
-    await FlutterPcmSound.feed(Uint8List.fromList(frame));
+    final samples = sineWave(periods: 20, sampleRate: sampleRate, freq: freq);
+    await FlutterPcmSound.feed(samples);
 }
 
 await FlutterPcmSound.setup(sampleRate: 44100, channelCount: 1);
