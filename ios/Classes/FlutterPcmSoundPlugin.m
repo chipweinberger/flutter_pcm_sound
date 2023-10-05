@@ -75,7 +75,11 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
             // create
             AudioComponentDescription desc;
             desc.componentType = kAudioUnitType_Output;
+#if TARGET_OS_IOS
+            desc.componentSubType = kAudioUnitSubType_RemoteIO;
+#else // MacOS
             desc.componentSubType = kAudioUnitSubType_DefaultOutput;
+#endif
             desc.componentFlags = 0;
             desc.componentFlagsMask = 0;
             desc.componentManufacturer = kAudioUnitManufacturer_Apple;

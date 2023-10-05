@@ -17,7 +17,13 @@ Please star this repo & on [pub.dev](https://pub.dev/packages/flutter_pcm_sound)
 ## Example App
 
 ```
+# enable the platforms you need
 cd ./example
+flutter config --enable-web                           
+flutter config --enable-macos-desktop                                                      
+flutter config --enable-android 
+flutter config --enable-ios 
+flutter create .
 flutter run
 ```
 

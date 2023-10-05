@@ -4,7 +4,6 @@
 #else
 #import <Flutter/Flutter.h>
 #endif
-#import <CoreAudio/CoreAudio.h>
 
 #define NAMESPACE @"flutter_pcm_sound"
 
