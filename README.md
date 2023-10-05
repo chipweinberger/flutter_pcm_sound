@@ -4,7 +4,7 @@
     <img alt="Logo" src="https://github.com/chipweinberger/flutter_pcm_sound/blob/master/site/logo.png?raw=true" style="height: 300px;" />
 </p>
 
-FlutterPcmSound is a [Flutter](https://flutter.dev) plugin for playing raw PCM audio (16-bit integer) in your Flutter app.
+Send real-time PCM audio (16-bit integer) to your device speakers, from your Flutter app!
 
 ## No Dependencies
 
@@ -16,14 +16,15 @@ Please star this repo & on [pub.dev](https://pub.dev/packages/flutter_pcm_sound)
 
 ## Callback Based
 
-FlutterPcmSound uses a callback `setFeedCallback` so you know when to feed more samples.
+FlutterPcmSound uses a callback `setFeedCallback` to signal when feed more samples.
 
 You can also manually `feed` whenever or use `remainingSamples`.
 
 ## Example App
 
+Enable just the platforms you need.
+
 ```
-# enable platforms you need
 cd ./example
 flutter config --enable-web                           
 flutter config --enable-macos-desktop                                                      
