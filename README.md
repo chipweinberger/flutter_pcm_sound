@@ -38,24 +38,11 @@ flutter run
 
 ```dart
 // for testing purposes
-List<int> sineWave({int periods = 1, int sampleRate = 44100, int freq = 440, double volume = 0.5}) {
-    final period = 1.0 / freq;
-    final nFramesPerPeriod = (period * sampleRate).toInt();
-    final totalFrames = nFramesPerPeriod * periods;
-    final step = math.pi * 2 / nFramesPerPeriod;
-    List<int> data = List.filled(totalFrames, 0);
-    for (int i = 0; i < totalFrames; i++) {
-        data[i] = (math.sin(step * (i % nFramesPerPeriod)) * volume * 32767).toInt();
-    }
-    return data;
-}
+MajorScale scale = MajorScale(sampleRate: 44100, noteDuration: 0.25);
 
 // invoked whenever we need to feed more samples to the platform
-int fed = 0;
 void onFeed(int remainingFrames) async {
-    int step = (fed ~/ (sampleRate / 2)) % 14;
-    int freq = 200 + (step < 7 ? 50 * step : 300 - (step - 7) * 50);
-    List<int> frame = sineWave(periods: 20, sampleRate: sampleRate, freq: freq);
+    List<int> frame = scale.generate(periods: 100);
     await FlutterPcmSound.feed(PcmArrayInt16.fromList(frame));
     fed += frame.length;
 }
