@@ -84,10 +84,8 @@ public class FlutterPcmSoundPlugin implements
 
                 int minBufferSize = AudioTrack.getMinBufferSize(
                     sampleRate, channelConfig, AudioFormat.ENCODING_PCM_16BIT);
-                    
-                int audioBufSize = minBufferSize + (sampleRate * 30);
 
-                if (Build.VERSION.SDK_INT >= 33) { // Android 6 (August 2015)
+                if (Build.VERSION.SDK_INT >= 23) { // Android 6 (August 2015)
                     mAudioTrack = new AudioTrack.Builder()
                         .setAudioAttributes(new AudioAttributes.Builder()
                                 .setUsage(AudioAttributes.USAGE_MEDIA)
@@ -98,7 +96,8 @@ public class FlutterPcmSoundPlugin implements
                                 .setSampleRate(sampleRate)
                                 .setChannelMask(channelConfig)
                                 .build())
-                        .setBufferSizeInBytes(audioBufSize)
+                        .setBufferSizeInBytes(minBufferSize)
+                        .setTransferMode(AudioTrack.MODE_STREAM)
                         .build();
                 } else {
                     mAudioTrack = new AudioTrack(
@@ -106,7 +105,7 @@ public class FlutterPcmSoundPlugin implements
                         sampleRate, 
                         channelConfig,
                         AudioFormat.ENCODING_PCM_16BIT,
-                        audioBufSize,
+                        minBufferSize,
                         AudioTrack.MODE_STREAM);
                 }
 
@@ -135,8 +134,10 @@ public class FlutterPcmSoundPlugin implements
             case "feed":
                 byte[] buffer = call.argument("buffer");
 
+                ByteBuffer bufferByte = ByteBuffer.wrap(buffer);
+
                 // write
-                int wrote = mAudioTrack.write(buffer, 0, buffer.length);
+                int wrote = mAudioTrack.write(bufferByte, bufferByte.remaining(), AudioTrack.WRITE_BLOCKING);
                 if (wrote < 0) {
                     result.error("mAudioTrackWriteFailed", "error: " + audioTrackErrorString(wrote), null);
                     return;
@@ -146,10 +147,8 @@ public class FlutterPcmSoundPlugin implements
 
                 // setup feed callback
                 if (remainingFrames() < mFeedThreshold) {
-                    Log.d("", "invokeFeedCallback now " + remainingFrames());
                     invokeFeedCallback();
                 } else {
-                    Log.d("", "invokeFeedCallback future " + remainingFrames());
                     // calculate marker position while accounting for wrap around
                     int marker = (int) (mFedSamples - mFeedThreshold);
                     int rv = mAudioTrack.setNotificationMarkerPosition(marker);
