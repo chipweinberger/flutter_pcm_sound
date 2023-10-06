@@ -25,7 +25,7 @@ class PcmSoundApp extends StatefulWidget {
 
 class _PcmSoundAppState extends State<PcmSoundApp> {
   int fed = 0;
-  int remainingSamples = 0;
+  int remainingFrames = 0;
 
   @override
   void initState() {
@@ -40,8 +40,8 @@ class _PcmSoundAppState extends State<PcmSoundApp> {
     super.dispose();
   }
 
-  void onFeed(int remainingSamples) async {
-    this.remainingSamples = remainingSamples;
+  void onFeed(int remainingFrames) async {
+    this.remainingFrames = remainingFrames;
     setState(() {});
     int step = (fed ~/ (sampleRate / 2)) % 14;
     int freq = 200 + (step < 7 ? 50 * step : 300 - (step - 7) * 50);
@@ -96,7 +96,7 @@ class _PcmSoundAppState extends State<PcmSoundApp> {
                   FlutterPcmSound.stop();
                   setState(() {
                     fed = 0;
-                    remainingSamples = 0;
+                    remainingFrames = 0;
                   });
                 },
                 child: Text('Stop'),
@@ -105,12 +105,12 @@ class _PcmSoundAppState extends State<PcmSoundApp> {
                 onPressed: () {
                   FlutterPcmSound.clear();
                   setState(() {
-                    remainingSamples = 0;
+                    remainingFrames = 0;
                   });
                 },
                 child: Text('Clear'),
               ),
-              Text('$remainingSamples Remaining Samples')
+              Text('$remainingFrames Remaining Samples')
             ],
           ),
         ),

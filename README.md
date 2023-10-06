@@ -18,7 +18,7 @@ Please star this repo & on [pub.dev](https://pub.dev/packages/flutter_pcm_sound)
 
 FlutterPcmSound uses a callback `setFeedCallback` to signal when feed more samples.
 
-You can also manually `feed` whenever or use `remainingSamples`.
+You can also manually `feed` whenever or use `remainingFrames`.
 
 ## Example App
 
@@ -52,7 +52,7 @@ List<int> sineWave({int periods = 1, int sampleRate = 44100, int freq = 440, dou
 
 // invoked whenever we need to feed more samples to the platform
 int fed = 0;
-void onFeed(int remainingSamples) async {
+void onFeed(int remainingFrames) async {
     int step = (fed ~/ (sampleRate / 2)) % 14;
     int freq = 200 + (step < 7 ? 50 * step : 300 - (step - 7) * 50);
     List<int> frame = sineWave(periods: 20, sampleRate: sampleRate, freq: freq);
@@ -61,7 +61,7 @@ void onFeed(int remainingSamples) async {
 }
 
 await FlutterPcmSound.setup(sampleRate: 44100, channelCount: 1);
-await FlutterPcmSound.setFeedThreshold(8000); // feed when below 8000 queued samples
+await FlutterPcmSound.setFeedThreshold(8000); // feed when below 8000 queued frames
 await FlutterPcmSound.setFeedCallback(onFeed);
 await FlutterPcmSound.play();
 ```
@@ -78,8 +78,8 @@ await FlutterPcmSound.clear();
 // suspend playback & clear queued samples
 await FlutterPcmSound.stop();
 
-// get the current number of queued samples
-int samples = await FlutterPcmSound.remainingSamples();
+// get the current number of queued frames
+int samples = await FlutterPcmSound.remainingFrames();
 ```
 
 

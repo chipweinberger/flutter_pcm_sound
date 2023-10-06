@@ -201,7 +201,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 
             result(@(true));
         }
-        else if ([@"remainingSamples" isEqualToString:call.method])
+        else if ([@"remainingFrames" isEqualToString:call.method])
         {
             NSUInteger count = 0;
             @synchronized (self.mSamples) {
@@ -248,7 +248,7 @@ static OSStatus RenderCallback(void *inRefCon,
 {
     FlutterPcmSoundPlugin *instance = (__bridge FlutterPcmSoundPlugin *)(inRefCon);
 
-    NSUInteger remainingSamples;
+    NSUInteger remainingFrames;
     BOOL shouldRequestMore = false;
 
     @synchronized (instance.mSamples) {
@@ -262,9 +262,9 @@ static OSStatus RenderCallback(void *inRefCon,
         NSRange range = NSMakeRange(0, bytesToCopy);
         [instance.mSamples replaceBytesInRange:range withBytes:NULL length:0];
 
-        remainingSamples = [instance.mSamples length] / (instance.mNumChannels * sizeof(short));
+        remainingFrames = [instance.mSamples length] / (instance.mNumChannels * sizeof(short));
 
-        if (remainingSamples < instance.mNumChannels * instance.mFeedThreshold) { 
+        if (remainingFrames < instance.mFeedThreshold) { 
             if (instance.invokeFeedCallback) {
                 shouldRequestMore = true;
                 instance.invokeFeedCallback = false;
@@ -273,7 +273,7 @@ static OSStatus RenderCallback(void *inRefCon,
     }
 
     if (shouldRequestMore) { 
-        NSDictionary *response = @{@"remaining_samples": @(remainingSamples)};
+        NSDictionary *response = @{@"remaining_samples": @(remainingFrames)};
         dispatch_async(dispatch_get_main_queue(), ^{
             [instance.mMethodChannel invokeMethod:@"OnFeedSamples" arguments:response];
         });

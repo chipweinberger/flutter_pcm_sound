@@ -1,5 +1,6 @@
 package com.lib.flutter_pcm_sound;
 
+import android.util.Log;
 import android.os.Build;
 import android.media.AudioFormat;
 import android.media.AudioManager;
@@ -70,7 +71,7 @@ public class FlutterPcmSoundPlugin implements
                 break;
             case "setup":
                 int sampleRate = call.argument("sample_rate");
-                mNumChannels = call.argument("num_channels");
+                mNumChannels = (int) call.argument("num_channels");
 
                 // cleanup
                 if (mAudioTrack != null) {
@@ -115,6 +116,7 @@ public class FlutterPcmSoundPlugin implements
                 break;
             case "play":
                 mAudioTrack.play();
+                invokeFeedCallback();
                 result.success(true);
                 break;
             case "pause":
@@ -140,12 +142,14 @@ public class FlutterPcmSoundPlugin implements
                     return;
                 }
 
-                mFedSamples += wrote;
+                mFedSamples += wrote / ( 2 * mNumChannels); 
 
                 // setup feed callback
-                if (remainingSamples() < mFeedThreshold) {
+                if (remainingFrames() < mFeedThreshold) {
+                    Log.d("", "invokeFeedCallback now " + remainingFrames());
                     invokeFeedCallback();
                 } else {
+                    Log.d("", "invokeFeedCallback future " + remainingFrames());
                     // calculate marker position while accounting for wrap around
                     int marker = (int) (mFedSamples - mFeedThreshold);
                     int rv = mAudioTrack.setNotificationMarkerPosition(marker);
@@ -158,11 +162,11 @@ public class FlutterPcmSoundPlugin implements
                 result.success(true);
                 break;
             case "setFeedThreshold":
-                mFeedThreshold = call.argument("feed_threshold");
+                mFeedThreshold = (int) call.argument("feed_threshold");
                 result.success(true);
                 break;
-            case "remainingSamples":
-                result.success(remainingSamples());
+            case "remainingFrames":
+                result.success(remainingFrames());
                 break;
             case "release":
                 cleanup();
@@ -200,8 +204,8 @@ public class FlutterPcmSoundPlugin implements
         return cur + mOverflows * 4294967296L; // 2^32
     }
 
-    private long remainingSamples() {
-        return mFedSamples - realPlaybackHeadPosition();
+    private long remainingFrames() {
+        return (mFedSamples * mNumChannels) - realPlaybackHeadPosition();
     }
 
     private void cleanup() {
@@ -214,7 +218,7 @@ public class FlutterPcmSoundPlugin implements
 
     private void invokeFeedCallback() {
         Map<String, Object> response = new HashMap<>();
-        response.put("remaining_samples", remainingSamples());
+        response.put("remaining_samples", remainingFrames());
         mMethodChannel.invokeMethod("OnFeedSamples", response);
     }
 

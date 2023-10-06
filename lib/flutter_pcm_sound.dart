@@ -56,7 +56,7 @@ class FlutterPcmSound {
 
   /// set the threshold at which we call the
   /// feed callback. i.e. if we have less than X
-  /// queued samples, the feed callback will be invoked
+  /// queued frames, the feed callback will be invoked
   static Future<void> setFeedThreshold(int threshold) async {
     return await _invokeMethod('setFeedThreshold', {'feed_threshold': threshold});
   }
@@ -69,8 +69,8 @@ class FlutterPcmSound {
   }
 
   /// get the number of queued samples remaining
-  static Future<int> remainingSamples() async {
-    return await _invokeMethod('remainingSamples');
+  static Future<int> remainingFrames() async {
+    return await _invokeMethod('remainingFrames');
   }
 
   /// release all audio resources
@@ -104,9 +104,9 @@ class FlutterPcmSound {
     }
     switch (call.method) {
       case 'OnFeedSamples':
-        int remainingSamples = call.arguments["remaining_samples"];
+        int remainingFrames = call.arguments["remaining_samples"];
         if (onFeedSamplesCallback != null) {
-          onFeedSamplesCallback!(remainingSamples);
+          onFeedSamplesCallback!(remainingFrames);
         }
         break;
       default:
