@@ -30,8 +30,8 @@ class _PcmSoundAppState extends State<PcmSoundApp> {
   @override
   void initState() {
     super.initState();
-    FlutterPcmSound.setup(sampleRate: sampleRate, channelCount: 1);
-    FlutterPcmSound.setFeedThreshold(8000);
+    FlutterPcmSound.setup(sampleRate: sampleRate, channelCount: 1, androidBufferMultiply: 3);
+    FlutterPcmSound.setFeedThreshold(3000);
     FlutterPcmSound.setFeedCallback(onFeed);
   }
 
@@ -45,7 +45,7 @@ class _PcmSoundAppState extends State<PcmSoundApp> {
     setState(() {});
     int step = (fed ~/ (sampleRate / 2)) % 14;
     int freq = 200 + (step < 7 ? 50 * step : 300 - (step - 7) * 50);
-    List<int> frame = sineWave(periods: 20, sampleRate: sampleRate, freq: freq);
+    List<int> frame = sineWave(periods: 40, sampleRate: sampleRate, freq: freq);
     await FlutterPcmSound.feed(PcmArrayInt16.fromList(frame));
     fed += frame.length;
   }

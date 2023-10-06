@@ -23,10 +23,11 @@ public class FlutterPcmSoundPlugin implements
     MethodChannel.MethodCallHandler,
     AudioTrack.OnPlaybackPositionUpdateListener
 {
+    private static final String TAG = "[PCM-Android]";
     private static final String CHANNEL_NAME = "flutter_pcm_sound/methods";
     private MethodChannel mMethodChannel;
     private AudioTrack mAudioTrack;
-    private long mNumChannels;
+    private int mNumChannels;
     private long mFeedThreshold = 8000;
     private long mFedSamples;
     private long mPreviousHeadPosition = 0;
@@ -71,7 +72,8 @@ public class FlutterPcmSoundPlugin implements
                 break;
             case "setup":
                 int sampleRate = call.argument("sample_rate");
-                mNumChannels = (int) call.argument("num_channels");
+                mNumChannels = call.argument("num_channels");
+                double androidBufferMultiply = call.argument("android_buffer_multiply");
 
                 // cleanup
                 if (mAudioTrack != null) {
@@ -82,8 +84,15 @@ public class FlutterPcmSoundPlugin implements
                     AudioFormat.CHANNEL_OUT_STEREO :
                     AudioFormat.CHANNEL_OUT_MONO;
 
+                int perFrame = 2 * mNumChannels;
+
                 int minBufferSize = AudioTrack.getMinBufferSize(
                     sampleRate, channelConfig, AudioFormat.ENCODING_PCM_16BIT);
+
+                int audioBufferSize = (int) (minBufferSize * androidBufferMultiply);
+
+                Log.d(TAG, "minBufferSize: " + (minBufferSize / perFrame) + " frames");
+                Log.d(TAG, "audioBufferSize: " + (audioBufferSize / perFrame) + " frames");
 
                 if (Build.VERSION.SDK_INT >= 23) { // Android 6 (August 2015)
                     mAudioTrack = new AudioTrack.Builder()
@@ -96,7 +105,7 @@ public class FlutterPcmSoundPlugin implements
                                 .setSampleRate(sampleRate)
                                 .setChannelMask(channelConfig)
                                 .build())
-                        .setBufferSizeInBytes(minBufferSize)
+                        .setBufferSizeInBytes(audioBufferSize)
                         .setTransferMode(AudioTrack.MODE_STREAM)
                         .build();
                 } else {
@@ -105,7 +114,7 @@ public class FlutterPcmSoundPlugin implements
                         sampleRate, 
                         channelConfig,
                         AudioFormat.ENCODING_PCM_16BIT,
-                        minBufferSize,
+                        audioBufferSize,
                         AudioTrack.MODE_STREAM);
                 }
 
@@ -123,6 +132,8 @@ public class FlutterPcmSoundPlugin implements
                 result.success(true);
                 break;
             case "stop":
+                mFedSamples = 0;
+                mPreviousHeadPosition = 0;
                 mAudioTrack.stop();
                 mAudioTrack.flush();
                 result.success(true);

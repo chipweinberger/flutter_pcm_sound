@@ -22,10 +22,13 @@ class FlutterPcmSound {
   }
 
   /// setup audio
-  static Future<void> setup({required int sampleRate, required int channelCount}) async {
+  /// audioBufferMultiply: (android-only) You can control the size of the audio buffer 
+  ///    that android uses with this argument. Valid range is 1.0 - 3.0 (typical)
+  static Future<void> setup({required int sampleRate, required int channelCount, double androidBufferMultiply = 1.0}) async {
     return await _invokeMethod('setup', {
       'sample_rate': sampleRate,
       'num_channels': channelCount,
+      'android_buffer_multiply': androidBufferMultiply,
     });
   }
 
