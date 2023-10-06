@@ -270,7 +270,7 @@ public class FlutterPcmSoundPlugin implements
                             }
 
                             // If nearing buffer underflow, feed
-                            if (mSamplesRemainingFrames() < mFeedThreshold && mDidInvokeFeedCallback == false) {
+                            if (mSamplesRemainingFrames() <= mFeedThreshold && mDidInvokeFeedCallback == false) {
                                 mDidInvokeFeedCallback = true;
                                 mainThreadHandler.post(() -> invokeFeedCallback());
                             }

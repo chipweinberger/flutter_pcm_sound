@@ -31,7 +31,7 @@ class _PcmSoundAppState extends State<PcmSoundApp> {
     super.initState();
     FlutterPcmSound.setLogLevel(LogLevel.verbose);
     FlutterPcmSound.setup(sampleRate: sampleRate, channelCount: 1);
-    FlutterPcmSound.setFeedThreshold(8000);
+    FlutterPcmSound.setFeedThreshold(sampleRate~/20);
     FlutterPcmSound.setFeedCallback(onFeed);
   }
 

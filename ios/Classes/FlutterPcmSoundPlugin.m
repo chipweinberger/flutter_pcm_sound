@@ -266,7 +266,7 @@ static OSStatus RenderCallback(void *inRefCon,
 
         remainingFrames = [instance.mSamples length] / (instance.mNumChannels * sizeof(short));
 
-        if (remainingFrames < instance.mFeedThreshold) { 
+        if (remainingFrames <= instance.mFeedThreshold) { 
             if (instance.mDidInvokeFeedCallback == false) {
                 instance.mDidInvokeFeedCallback = true;
                 shouldRequestMore = true;
