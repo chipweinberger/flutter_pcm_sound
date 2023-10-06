@@ -60,16 +60,9 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 
             self.mNumChannels = [numChannels intValue];
 
-            // reset
-            @synchronized (self.mSamples) {
-                self.mSamples = [NSMutableData new]; 
-            }
-
-            // destroy
+            // cleanup
             if (_mAudioUnit != nil) {
-                AudioUnitUninitialize(_mAudioUnit);
-                AudioComponentInstanceDispose(_mAudioUnit);
-                _mAudioUnit = nil;
+                [self cleanup];
             }
 
             // create
@@ -218,14 +211,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
         }
         else if([@"release" isEqualToString:call.method])
         {
-            if (_mAudioUnit != nil) {
-                AudioUnitUninitialize(_mAudioUnit);
-                AudioComponentInstanceDispose(_mAudioUnit);
-                _mAudioUnit = nil;
-            }
-            @synchronized (self.mSamples) {
-                self.mSamples = [NSMutableData new]; 
-            }
+            [self cleanup];
             result(@(true));
         }
         else
@@ -241,7 +227,17 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
     }
 }
 
-
+- (void)cleanup
+{
+    if (_mAudioUnit != nil) {
+        AudioUnitUninitialize(_mAudioUnit);
+        AudioComponentInstanceDispose(_mAudioUnit);
+        _mAudioUnit = nil;
+    }
+    @synchronized (self.mSamples) {
+        self.mSamples = [NSMutableData new]; 
+    }
+}
 
 static OSStatus RenderCallback(void *inRefCon,
                                AudioUnitRenderActionFlags *ioActionFlags,

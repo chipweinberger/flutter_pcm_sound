@@ -34,10 +34,6 @@ flutter create .
 flutter run
 ```
 
-<p align="center">
-<img alt="example" src="https://github.com/chipweinberger/flutter_pcm_sound/blob/master/site/example.png?raw=true" />
-</p>
-
 ## Usage
 
 ```dart

@@ -15,7 +15,7 @@ flutter:
   plugin:
     platforms:
       android:
-        package: flutter_pcm_sound
+        package: com.lib.flutter_pcm_sound
         pluginClass: FlutterPcmSoundPlugin
       ios:
         pluginClass: FlutterPcmSoundPlugin
