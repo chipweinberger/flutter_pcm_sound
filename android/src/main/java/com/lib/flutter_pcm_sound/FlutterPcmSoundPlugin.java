@@ -171,6 +171,8 @@ public class FlutterPcmSoundPlugin implements
                     invokeFeedCallback();
                 }
 
+                onPeriodicNotification(mAudioTrack);
+
                 result.success(true);
                 break;
             case "setFeedThreshold":
@@ -199,6 +201,13 @@ public class FlutterPcmSoundPlugin implements
     private ByteBuffer mSamplesPop() {
         samplesLock.lock();
         ByteBuffer out =  mSamples.poll();
+        samplesLock.unlock();
+        return out;
+    }
+
+    private boolean mSamplesIsEmpty() {
+        samplesLock.lock();
+        boolean out =  mSamples.isEmpty();
         samplesLock.unlock();
         return out;
     }
@@ -264,7 +273,7 @@ public class FlutterPcmSoundPlugin implements
 
         // Write samples to the AudioTrack buffer as long as we
         // have space in the buffer and samples in the queue
-        while (space >= MAX_FRAMES_PER_BUFFER && !mSamples.isEmpty()) {
+        while (space >= MAX_FRAMES_PER_BUFFER && !mSamplesIsEmpty()) {
             ByteBuffer data = mSamplesPop();
             int wrote = mAudioTrack.write(data, data.remaining(), AudioTrack.WRITE_BLOCKING);
             if (wrote > 0) {
@@ -300,13 +309,11 @@ public class FlutterPcmSoundPlugin implements
         List<ByteBuffer> chunks = new ArrayList<>();
         int offset = 0;
         while (offset < buffer.length) {
-            // create
             int length = Math.min(buffer.length - offset, maxSize);
-            ByteBuffer chunk = ByteBuffer.allocate(length);
-            chunk.put(buffer, offset, length);
-            
-            // add
-            chunks.add(chunk);
+            ByteBuffer b = ByteBuffer.allocate(length);
+            b.put(buffer, offset, length);
+            b.rewind();
+            chunks.add(b);
             offset += length;
         }
         return chunks;

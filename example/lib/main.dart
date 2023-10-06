@@ -24,14 +24,16 @@ class PcmSoundApp extends StatefulWidget {
 }
 
 class _PcmSoundAppState extends State<PcmSoundApp> {
-  int fed = 0;
+  int periodIdx = 0;
   int remainingFrames = 0;
+  bool stopFeeding = false;
 
   @override
   void initState() {
     super.initState();
-    FlutterPcmSound.setup(sampleRate: sampleRate, channelCount: 1, androidBufferMultiply: 3);
-    FlutterPcmSound.setFeedThreshold(3000);
+    FlutterPcmSound.setLogLevel(LogLevel.none);
+    FlutterPcmSound.setup(sampleRate: sampleRate, channelCount: 1);
+    FlutterPcmSound.setFeedThreshold(8000);
     FlutterPcmSound.setFeedCallback(onFeed);
   }
 
@@ -40,28 +42,62 @@ class _PcmSoundAppState extends State<PcmSoundApp> {
     super.dispose();
   }
 
+  List<double> get scale {
+    List<double> c = [261.63, 294.33, 327.03, 348.83, 392.44, 436.05, 490.55, 523.25];
+    return c + c.reversed.toList();
+  }
+
+  int periodsForNote(double freq, double noteDuration) {
+    int nFramesPerPeriod = (sampleRate / freq).round();
+    int totalFramesForDuration = (noteDuration * sampleRate).round();
+    return totalFramesForDuration ~/ nFramesPerPeriod;
+  }
+
+  int periodsForScale(double noteDuration) {
+    int total = 0;
+    for (double freq in scale) {
+      total += periodsForNote(freq, noteDuration);
+    }
+    return total;
+  }
+
+  double note(int periodIdx, double noteDuration) {
+    int accum = 0;
+    for (int n = 0; n < scale.length; n++) {
+      accum += periodsForNote(scale[n], noteDuration);
+      if (periodIdx < accum) {
+        return scale[n];
+      }
+    }
+    return scale.last;
+  }
+
   void onFeed(int remainingFrames) async {
     this.remainingFrames = remainingFrames;
     setState(() {});
-    int step = (fed ~/ (sampleRate / 2)) % 14;
-    int freq = 200 + (step < 7 ? 50 * step : 300 - (step - 7) * 50);
-    List<int> frame = sineWave(periods: 40, sampleRate: sampleRate, freq: freq);
-    await FlutterPcmSound.feed(PcmArrayInt16.fromList(frame));
-    fed += frame.length;
+    if (stopFeeding == false) {
+      List<int> frames = [];
+      // feed 100 more periods
+      for (int i = 0; i < 100; i++) {
+        double noteDuration = 0.20;
+        periodIdx %= periodsForScale(noteDuration);
+        double freq = note(periodIdx, noteDuration);
+        frames += sineWave(periods: 1, sampleRate: sampleRate, freq: freq);
+        periodIdx++;
+      }
+      await FlutterPcmSound.feed(PcmArrayInt16.fromList(frames));
+    }
   }
 
-  List<int> sineWave({int periods = 1, int sampleRate = 44100, int freq = 440, double volume = 0.5}) {
+  List<int> sineWave({int periods = 1, int sampleRate = 44100, double freq = 440, double volume = 0.5}) {
     final period = 1.0 / freq;
     final nFramesPerPeriod = (period * sampleRate).toInt();
     final totalFrames = nFramesPerPeriod * periods;
     final step = math.pi * 2 / nFramesPerPeriod;
-
     List<int> data = List.filled(totalFrames, 0);
-
     for (int i = 0; i < totalFrames; i++) {
       data[i] = (math.sin(step * (i % nFramesPerPeriod)) * volume * 32767).toInt();
     }
-
     return data;
   }
 
@@ -82,6 +118,7 @@ class _PcmSoundAppState extends State<PcmSoundApp> {
               ElevatedButton(
                 onPressed: () {
                   FlutterPcmSound.play();
+                  stopFeeding = false;
                 },
                 child: Text('Play'),
               ),
@@ -93,9 +130,15 @@ class _PcmSoundAppState extends State<PcmSoundApp> {
               ),
               ElevatedButton(
                 onPressed: () {
+                  stopFeeding = true;
+                },
+                child: Text('Stop Feeding'),
+              ),
+              ElevatedButton(
+                onPressed: () {
                   FlutterPcmSound.stop();
                   setState(() {
-                    fed = 0;
+                    periodIdx = 0;
                     remainingFrames = 0;
                   });
                 },
