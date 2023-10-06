@@ -160,7 +160,7 @@ class MajorScale {
   // C Major Scale (Just Intonation)
   List<double> get scale {
     List<double> c = [261.63, 294.33, 327.03, 348.83, 392.44, 436.05, 490.55, 523.25];
-    return c + c.reversed.toList();
+    return [c[0]] +  c + c.reversed.toList().sublist(0, c.length-1);
   }
 
   // total periods needed to play the entire note

@@ -19,7 +19,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 @property(nonatomic) NSMutableData *mSamples;
 @property(nonatomic) int mNumChannels; 
 @property(nonatomic) int mFeedThreshold; 
-@property(nonatomic) bool mFedOnce; 
+@property(nonatomic) bool mDidInvokeFeedCallback; 
 @end
 
 @implementation FlutterPcmSoundPlugin
@@ -34,7 +34,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
     instance.mLogLevel = verbose;
     instance.mSamples = [NSMutableData new];
     instance.mFeedThreshold = 8000;
-    instance.mFedOnce = false;
+    instance.mDidInvokeFeedCallback = false;
 
     [registrar addMethodCallDelegate:instance channel:methodChannel];
 }
@@ -137,7 +137,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
         }
         else if ([@"play" isEqualToString:call.method])
         {
-            self.mFedOnce = false;
+            self.mDidInvokeFeedCallback = false;
 
             OSStatus status = AudioOutputUnitStart(_mAudioUnit);
             if (status != noErr) {
@@ -187,8 +187,10 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 
             @synchronized (self.mSamples) {
                 [self.mSamples appendData:buffer.data];
-                self.mFedOnce = false;
             }
+
+            // reset
+            self.mDidInvokeFeedCallback = false;
 
             result(@(true));
         }
@@ -265,8 +267,8 @@ static OSStatus RenderCallback(void *inRefCon,
         remainingFrames = [instance.mSamples length] / (instance.mNumChannels * sizeof(short));
 
         if (remainingFrames < instance.mFeedThreshold) { 
-            if (instance.mFedOnce == false) {
-                instance.mFedOnce = true;
+            if (instance.mDidInvokeFeedCallback == false) {
+                instance.mDidInvokeFeedCallback = true;
                 shouldRequestMore = true;
             }
         }

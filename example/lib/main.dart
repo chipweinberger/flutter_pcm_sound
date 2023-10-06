@@ -22,14 +22,14 @@ class PcmSoundApp extends StatefulWidget {
 }
 
 class _PcmSoundAppState extends State<PcmSoundApp> {
-  int remainingFrames = 0;
+  int _remainingFrames = 0;
   bool stopFeeding = false;
   MajorScale scale = MajorScale(sampleRate: sampleRate, noteDuration: 0.20);
 
   @override
   void initState() {
     super.initState();
-    FlutterPcmSound.setLogLevel(LogLevel.none);
+    FlutterPcmSound.setLogLevel(LogLevel.verbose);
     FlutterPcmSound.setup(sampleRate: sampleRate, channelCount: 1);
     FlutterPcmSound.setFeedThreshold(8000);
     FlutterPcmSound.setFeedCallback(onFeed);
@@ -41,10 +41,11 @@ class _PcmSoundAppState extends State<PcmSoundApp> {
   }
 
   void onFeed(int remainingFrames) async {
-    this.remainingFrames = remainingFrames;
-    setState(() {});
+    setState(() {
+      _remainingFrames = remainingFrames;
+    });
     if (stopFeeding == false) {
-      List<int> frames = scale.generate(periods: 100);
+      List<int> frames = scale.generate(periods: 20);
       await FlutterPcmSound.feed(PcmArrayInt16.fromList(frames));
     }
   }
@@ -87,7 +88,7 @@ class _PcmSoundAppState extends State<PcmSoundApp> {
                   FlutterPcmSound.stop();
                   setState(() {
                     scale.reset();
-                    remainingFrames = 0;
+                    _remainingFrames = 0;
                   });
                 },
                 child: Text('Stop'),
@@ -96,12 +97,12 @@ class _PcmSoundAppState extends State<PcmSoundApp> {
                 onPressed: () {
                   FlutterPcmSound.clear();
                   setState(() {
-                    remainingFrames = 0;
+                    _remainingFrames = 0;
                   });
                 },
                 child: Text('Clear'),
               ),
-              Text('$remainingFrames Remaining Samples')
+              Text('$_remainingFrames Remaining Samples')
             ],
           ),
         ),
