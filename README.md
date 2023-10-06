@@ -16,24 +16,6 @@ In contrast to [raw_sound](https://pub.dev/packages/raw_sound), FlutterPcmSound 
 
 You can also manually `feed` whenever you like.
 
-## ⭐ Stars ⭐
-
-Please star this repo & on [pub.dev](https://pub.dev/packages/flutter_pcm_sound). We all benefit from having a larger community.
-
-## Example App
-
-Enable just the platforms you need.
-
-```
-cd ./example
-flutter config --enable-web                           
-flutter config --enable-macos-desktop                                                      
-flutter config --enable-android 
-flutter config --enable-ios 
-flutter create .
-flutter run
-```
-
 ## Usage
 
 ```dart
@@ -52,7 +34,7 @@ await FlutterPcmSound.setFeedCallback(onFeed);
 await FlutterPcmSound.play();
 ```
 
-## Other Useful Functions
+## Other Functions
 
 ```dart
 // suspend playback but does *not* clear queued samples
@@ -66,6 +48,24 @@ await FlutterPcmSound.stop();
 
 // get the current number of queued frames
 int samples = await FlutterPcmSound.remainingFrames();
+```
+
+## ⭐ Stars ⭐
+
+Please star this repo & on [pub.dev](https://pub.dev/packages/flutter_pcm_sound). We all benefit from having a larger community.
+
+## Example App
+
+Enable just the platforms you need.
+
+```
+cd ./example
+flutter config --enable-web                           
+flutter config --enable-macos-desktop                                                      
+flutter config --enable-android 
+flutter config --enable-ios 
+flutter create .
+flutter run
 ```
 
 
