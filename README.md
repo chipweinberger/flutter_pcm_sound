@@ -37,7 +37,7 @@ flutter run
 ## Usage
 
 ```dart
-// for testing purposes
+// for testing purposes, a C-Major scale 
 MajorScale scale = MajorScale(sampleRate: 44100, noteDuration: 0.25);
 
 // invoked whenever we need to feed more samples to the platform
