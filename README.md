@@ -10,15 +10,15 @@ Send real-time PCM audio (16-bit integer) to your device speakers, from your Flu
 
 FlutterPcmSound has zero dependencies besides Flutter, Android, iOS, and MacOS themselves.
 
+## Callback Based, For Real-Time Audio
+
+In contrast to [raw_sound](https://pub.dev/packages/raw_sound), FlutterPcmSound uses a callback `setFeedCallback` to signal when to feed more samples.
+
+You can also manually `feed` whenever you like.
+
 ## ⭐ Stars ⭐
 
 Please star this repo & on [pub.dev](https://pub.dev/packages/flutter_pcm_sound). We all benefit from having a larger community.
-
-## Callback Based
-
-FlutterPcmSound uses a callback `setFeedCallback` to signal when feed more samples.
-
-You can also manually `feed` whenever or use `remainingFrames`.
 
 ## Example App
 
