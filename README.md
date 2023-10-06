@@ -44,7 +44,6 @@ MajorScale scale = MajorScale(sampleRate: 44100, noteDuration: 0.25);
 void onFeed(int remainingFrames) async {
     List<int> frame = scale.generate(periods: 100);
     await FlutterPcmSound.feed(PcmArrayInt16.fromList(frame));
-    fed += frame.length;
 }
 
 await FlutterPcmSound.setup(sampleRate: 44100, channelCount: 1);
