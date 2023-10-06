@@ -19,7 +19,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 @property(nonatomic) NSMutableData *mSamples;
 @property(nonatomic) int mNumChannels; 
 @property(nonatomic) int mFeedThreshold; 
-@property(nonatomic) bool invokeFeedCallback; 
+@property(nonatomic) bool mFedOnce; 
 @end
 
 @implementation FlutterPcmSoundPlugin
@@ -34,7 +34,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
     instance.mLogLevel = verbose;
     instance.mSamples = [NSMutableData new];
     instance.mFeedThreshold = 8000;
-    instance.invokeFeedCallback = true;
+    instance.mFedOnce = false;
 
     [registrar addMethodCallDelegate:instance channel:methodChannel];
 }
@@ -137,7 +137,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
         }
         else if ([@"play" isEqualToString:call.method])
         {
-            self.invokeFeedCallback = true;
+            self.mFedOnce = false;
 
             OSStatus status = AudioOutputUnitStart(_mAudioUnit);
             if (status != noErr) {
@@ -187,7 +187,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 
             @synchronized (self.mSamples) {
                 [self.mSamples appendData:buffer.data];
-                self.invokeFeedCallback = true;
+                self.mFedOnce = false;
             }
 
             result(@(true));
@@ -265,15 +265,15 @@ static OSStatus RenderCallback(void *inRefCon,
         remainingFrames = [instance.mSamples length] / (instance.mNumChannels * sizeof(short));
 
         if (remainingFrames < instance.mFeedThreshold) { 
-            if (instance.invokeFeedCallback) {
+            if (instance.mFedOnce == false) {
+                instance.mFedOnce = true;
                 shouldRequestMore = true;
-                instance.invokeFeedCallback = false;
             }
         }
     }
 
     if (shouldRequestMore) { 
-        NSDictionary *response = @{@"remaining_samples": @(remainingFrames)};
+        NSDictionary *response = @{@"remaining_frames": @(remainingFrames)};
         dispatch_async(dispatch_get_main_queue(), ^{
             [instance.mMethodChannel invokeMethod:@"OnFeedSamples" arguments:response];
         });

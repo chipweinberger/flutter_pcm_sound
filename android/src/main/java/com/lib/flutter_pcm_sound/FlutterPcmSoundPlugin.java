@@ -9,9 +9,14 @@ import android.media.AudioAttributes;
 
 import androidx.annotation.NonNull;
 
-import java.nio.ByteBuffer;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+import java.nio.ByteBuffer;
 
 import io.flutter.embedding.engine.plugins.FlutterPlugin;
 import io.flutter.plugin.common.BinaryMessenger;
@@ -23,15 +28,26 @@ public class FlutterPcmSoundPlugin implements
     MethodChannel.MethodCallHandler,
     AudioTrack.OnPlaybackPositionUpdateListener
 {
+    private final int MAX_FRAMES_PER_BUFFER = 100;
+    private final int FRAMES_PER_NOTIFICATION = 500;
+
     private static final String TAG = "[PCM-Android]";
     private static final String CHANNEL_NAME = "flutter_pcm_sound/methods";
     private MethodChannel mMethodChannel;
+    
     private AudioTrack mAudioTrack;
     private int mNumChannels;
+    private int mMinBufferSize;
+
     private long mFeedThreshold = 8000;
-    private long mFedSamples;
+    private boolean mFedOnce = false;
+
+    private long mFedFrames;
     private long mPreviousHeadPosition = 0;
     private long mOverflows = 0;
+
+    private LinkedList<ByteBuffer> mSamples = new LinkedList<>();
+    private final Lock samplesLock = new ReentrantLock();
 
     @Override
     public void onAttachedToEngine(@NonNull FlutterPluginBinding binding) {
@@ -73,7 +89,6 @@ public class FlutterPcmSoundPlugin implements
             case "setup":
                 int sampleRate = call.argument("sample_rate");
                 mNumChannels = call.argument("num_channels");
-                double androidBufferMultiply = call.argument("android_buffer_multiply");
 
                 // cleanup
                 if (mAudioTrack != null) {
@@ -84,15 +99,10 @@ public class FlutterPcmSoundPlugin implements
                     AudioFormat.CHANNEL_OUT_STEREO :
                     AudioFormat.CHANNEL_OUT_MONO;
 
-                int perFrame = 2 * mNumChannels;
-
-                int minBufferSize = AudioTrack.getMinBufferSize(
+                mMinBufferSize = AudioTrack.getMinBufferSize(
                     sampleRate, channelConfig, AudioFormat.ENCODING_PCM_16BIT);
 
-                int audioBufferSize = (int) (minBufferSize * androidBufferMultiply);
-
-                Log.d(TAG, "minBufferSize: " + (minBufferSize / perFrame) + " frames");
-                Log.d(TAG, "audioBufferSize: " + (audioBufferSize / perFrame) + " frames");
+                Log.d(TAG, "minBufferSize: " + (mMinBufferSize/(2*mNumChannels)) + " frames");
 
                 if (Build.VERSION.SDK_INT >= 23) { // Android 6 (August 2015)
                     mAudioTrack = new AudioTrack.Builder()
@@ -105,7 +115,7 @@ public class FlutterPcmSoundPlugin implements
                                 .setSampleRate(sampleRate)
                                 .setChannelMask(channelConfig)
                                 .build())
-                        .setBufferSizeInBytes(audioBufferSize)
+                        .setBufferSizeInBytes(mMinBufferSize)
                         .setTransferMode(AudioTrack.MODE_STREAM)
                         .build();
                 } else {
@@ -114,7 +124,7 @@ public class FlutterPcmSoundPlugin implements
                         sampleRate, 
                         channelConfig,
                         AudioFormat.ENCODING_PCM_16BIT,
-                        audioBufferSize,
+                        mMinBufferSize,
                         AudioTrack.MODE_STREAM);
                 }
 
@@ -123,7 +133,9 @@ public class FlutterPcmSoundPlugin implements
                 result.success(true);
                 break;
             case "play":
+                mAudioTrack.setPositionNotificationPeriod(FRAMES_PER_NOTIFICATION);
                 mAudioTrack.play();
+                mFedOnce = false;
                 invokeFeedCallback();
                 result.success(true);
                 break;
@@ -132,7 +144,7 @@ public class FlutterPcmSoundPlugin implements
                 result.success(true);
                 break;
             case "stop":
-                mFedSamples = 0;
+                mFedFrames = 0;
                 mPreviousHeadPosition = 0;
                 mAudioTrack.stop();
                 mAudioTrack.flush();
@@ -145,28 +157,18 @@ public class FlutterPcmSoundPlugin implements
             case "feed":
                 byte[] buffer = call.argument("buffer");
 
-                ByteBuffer bufferByte = ByteBuffer.wrap(buffer);
-
-                // write
-                int wrote = mAudioTrack.write(bufferByte, bufferByte.remaining(), AudioTrack.WRITE_BLOCKING);
-                if (wrote < 0) {
-                    result.error("mAudioTrackWriteFailed", "error: " + audioTrackErrorString(wrote), null);
-                    return;
+                // Split into smaller buffers
+                List<ByteBuffer> got = split(buffer, MAX_FRAMES_PER_BUFFER);
+                for (ByteBuffer chunk : got) {
+                    mSamplesPush(chunk);
                 }
 
-                mFedSamples += wrote / ( 2 * mNumChannels); 
+                // reset
+                mFedOnce = false;
 
-                // setup feed callback
-                if (remainingFrames() < mFeedThreshold) {
+                // still need more frames?
+                if (remainingFrames() < mFeedThreshold){
                     invokeFeedCallback();
-                } else {
-                    // calculate marker position while accounting for wrap around
-                    int marker = (int) (mFedSamples - mFeedThreshold);
-                    int rv = mAudioTrack.setNotificationMarkerPosition(marker);
-                    if (rv < 0) {
-                        result.error("setNotificationMarkerPositionFailed", "error: " + audioTrackErrorString(rv), null);
-                        return;
-                    }
                 }
 
                 result.success(true);
@@ -186,6 +188,19 @@ public class FlutterPcmSoundPlugin implements
                 result.notImplemented();
                 break;
         }
+    }
+
+    private void mSamplesPush(ByteBuffer samples) {
+        samplesLock.lock();
+        mSamples.add(samples);
+        samplesLock.unlock();
+    }
+
+    private ByteBuffer mSamplesPop() {
+        samplesLock.lock();
+        ByteBuffer out =  mSamples.poll();
+        samplesLock.unlock();
+        return out;
     }
 
     // playback head is returned as an signed integer
@@ -215,11 +230,17 @@ public class FlutterPcmSoundPlugin implements
     }
 
     private long remainingFrames() {
-        return (mFedSamples * mNumChannels) - realPlaybackHeadPosition();
+        samplesLock.lock();
+        long totalBytes = 0;
+        for (ByteBuffer sampleBuffer : mSamples) {
+            totalBytes += sampleBuffer.remaining();
+        }
+        samplesLock.unlock();
+        return totalBytes / (2 * mNumChannels);
     }
 
     private void cleanup() {
-        mFedSamples = 0;
+        mFedFrames = 0;
         mPreviousHeadPosition = 0;
         mOverflows = 0;
         mAudioTrack.release();
@@ -228,18 +249,35 @@ public class FlutterPcmSoundPlugin implements
 
     private void invokeFeedCallback() {
         Map<String, Object> response = new HashMap<>();
-        response.put("remaining_samples", remainingFrames());
+        response.put("remaining_frames", remainingFrames());
         mMethodChannel.invokeMethod("OnFeedSamples", response);
     }
 
     @Override
     public void onMarkerReached(AudioTrack track) {
-        invokeFeedCallback();
     }
 
     @Override
     public void onPeriodicNotification(AudioTrack track) {
-        // unused
+        int occupancy = (int) (mFedFrames - realPlaybackHeadPosition());
+        int space = mMinBufferSize - occupancy;
+
+        // Write samples to the AudioTrack buffer as long as we
+        // have space in the buffer and samples in the queue
+        while (space >= MAX_FRAMES_PER_BUFFER && !mSamples.isEmpty()) {
+            ByteBuffer data = mSamplesPop();
+            int wrote = mAudioTrack.write(data, data.remaining(), AudioTrack.WRITE_BLOCKING);
+            if (wrote > 0) {
+                mFedFrames += wrote / (2 * mNumChannels);
+                space -= wrote;
+            }
+        }
+
+        // If nearing buffer underflow, feed
+        if (remainingFrames() < mFeedThreshold && mFedOnce == false) {
+            mFedOnce = true;
+            invokeFeedCallback();
+        }
     }
 
     private String audioTrackErrorString(int code) {
@@ -255,5 +293,22 @@ public class FlutterPcmSoundPlugin implements
             default:
                 return "unknownError(" + code + ")";
         }
+    }
+
+    // split large array into smaller ones
+    private List<ByteBuffer> split(byte[] buffer, int maxSize) {
+        List<ByteBuffer> chunks = new ArrayList<>();
+        int offset = 0;
+        while (offset < buffer.length) {
+            // create
+            int length = Math.min(buffer.length - offset, maxSize);
+            ByteBuffer chunk = ByteBuffer.allocate(length);
+            chunk.put(buffer, offset, length);
+            
+            // add
+            chunks.add(chunk);
+            offset += length;
+        }
+        return chunks;
     }
 }

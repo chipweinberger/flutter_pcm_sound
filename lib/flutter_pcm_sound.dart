@@ -107,7 +107,7 @@ class FlutterPcmSound {
     }
     switch (call.method) {
       case 'OnFeedSamples':
-        int remainingFrames = call.arguments["remaining_samples"];
+        int remainingFrames = call.arguments["remaining_frames"];
         if (onFeedSamplesCallback != null) {
           onFeedSamplesCallback!(remainingFrames);
         }
