@@ -38,7 +38,9 @@ public class FlutterPcmSoundPlugin implements
 
     private Handler mainThreadHandler = new Handler(Looper.getMainLooper());
     private Thread playbackThread;
-    private boolean running = true;
+    private final Object playbackLock = new Object();
+    private boolean playbackSuspended = true;
+    private boolean playbackRunning = true;
     
     private AudioTrack mAudioTrack;
     private int mNumChannels;
@@ -134,20 +136,29 @@ public class FlutterPcmSoundPlugin implements
                 result.success(true);
                 break;
             case "play":
+                if (mIsPlaying == false) {
+                    mDidInvokeFeedCallback = false;
+                    invokeFeedCallback();
+                    mAudioTrack.play();
+                    resumePlaybackThread();
+                }
                 mIsPlaying = true;
-                mDidInvokeFeedCallback = false;
-                invokeFeedCallback();
-                mAudioTrack.play();
                 result.success(true);
                 break;
             case "pause":
+                if (mIsPlaying == true) {
+                    mAudioTrack.pause();
+                    suspendPlaybackThread();
+                }
                 mIsPlaying = false;
-                mAudioTrack.pause();
                 result.success(true);
                 break;
             case "stop":
+                if (mIsPlaying == true) {
+                    mAudioTrack.pause();
+                    suspendPlaybackThread();
+                }
                 mIsPlaying = false;
-                mAudioTrack.pause();
                 mSamplesClear();
                 result.success(true);
                 break;
@@ -239,7 +250,17 @@ public class FlutterPcmSoundPlugin implements
     private void startPlaybackThread() {
         playbackThread = new Thread(() -> {
             android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_AUDIO);
-            while (running) {
+            while (playbackRunning) {
+                // suspend / resume
+                synchronized (playbackLock) {
+                    while (playbackSuspended) {
+                        try {
+                            playbackLock.wait();
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        }
+                    }
+                }
                 try {
                     if (mIsPlaying) {
                         while (mSamplesIsEmpty() == false) {
@@ -255,7 +276,6 @@ public class FlutterPcmSoundPlugin implements
                             }
                         }
                     }
-
                     // avoid excessive CPU usage
                     Thread.sleep(5); 
                 } catch (InterruptedException e) {
@@ -269,7 +289,7 @@ public class FlutterPcmSoundPlugin implements
 
     private void stopPlaybackThread() {
         if (playbackThread != null) {
-            running = false;
+            playbackRunning = false;
             playbackThread.interrupt();
             try {
                 playbackThread.join();
@@ -277,6 +297,19 @@ public class FlutterPcmSoundPlugin implements
                 Thread.currentThread().interrupt();
             }
             playbackThread = null;
+        }
+    }
+
+    public void suspendPlaybackThread() {
+        synchronized (playbackLock) {
+            playbackSuspended = true;
+        }
+    }
+
+    public void resumePlaybackThread() {
+        synchronized (playbackLock) {
+            playbackSuspended = false;
+            playbackLock.notify();
         }
     }
 
