@@ -14,6 +14,8 @@ FlutterPcmSound has zero dependencies besides Flutter, Android, iOS, and MacOS t
 
 In contrast to [raw_sound](https://pub.dev/packages/raw_sound), FlutterPcmSound uses a callback `setFeedCallback` to signal when to feed more samples.
 
+You can lower the queued sample threshold for your callback `setFeedThreshold` to achieve real time audio.
+
 You can also manually `feed` whenever you like.
 
 ## Usage
