@@ -26,7 +26,8 @@ MajorScale scale = MajorScale(sampleRate: 44100, noteDuration: 0.25);
 
 // invoked whenever we need to feed more samples to the platform
 void onFeed(int remainingFrames) async {
-    // you can use 'remainingFrames' to feed more/less as needed
+    // you could use 'remainingFrames' to feed very precisely.
+    // But here we just load a few thousand samples everytime we run low.
     List<int> frame = scale.generate(periods: 100);
     await FlutterPcmSound.feed(PcmArrayInt16.fromList(frame));
 }
