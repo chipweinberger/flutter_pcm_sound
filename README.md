@@ -60,7 +60,7 @@ Please star this repo & on [pub.dev](https://pub.dev/packages/flutter_pcm_sound)
 
 ## Example App
 
-Enable just the platforms you need.
+Enable the platforms you need.
 
 ```
 cd ./example                      
