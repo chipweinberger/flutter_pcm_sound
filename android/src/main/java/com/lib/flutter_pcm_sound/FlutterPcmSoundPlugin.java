@@ -130,7 +130,9 @@ public class FlutterPcmSoundPlugin implements
                         mMinBufferSize,
                         AudioTrack.MODE_STREAM);
                 }
-
+                playbackSuspended = true;
+                playbackRunning = true;
+                mDidInvokeFeedCallback =false;
                 startPlaybackThread();
 
                 result.success(true);
@@ -235,6 +237,7 @@ public class FlutterPcmSoundPlugin implements
 
     private void cleanup() {
         if (mAudioTrack != null) {
+            mAudioTrack.flush();
             mAudioTrack.release();
             mAudioTrack = null;
         }
@@ -289,10 +292,11 @@ public class FlutterPcmSoundPlugin implements
 
     private void stopPlaybackThread() {
         if (playbackThread != null) {
+            playbackSuspended = false;
             playbackRunning = false;
             playbackThread.interrupt();
             try {
-                playbackThread.join();
+                playbackThread.join(1);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
