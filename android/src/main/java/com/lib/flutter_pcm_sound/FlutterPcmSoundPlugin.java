@@ -258,30 +258,32 @@ public class FlutterPcmSoundPlugin implements
                 synchronized (playbackLock) {
                     while (playbackSuspended) {
                         try {
-                            playbackLock.wait();
+                            playbackLock.wait(); 
                         } catch (InterruptedException e) {
                             Thread.currentThread().interrupt();
                         }
                     }
                 }
-                try {
-                    if (mIsPlaying) {
-                        while (mSamplesIsEmpty() == false) {
-                            ByteBuffer data = mSamplesPop().duplicate();
-                            if (data != null && mAudioTrack != null) {
-                                mAudioTrack.write(data, data.remaining(), AudioTrack.WRITE_BLOCKING);
-                            }
+                if (playbackRunning) { 
+                    try {
+                        if (mIsPlaying) {
+                            while (mSamplesIsEmpty() == false) {
+                                ByteBuffer data = mSamplesPop().duplicate();
+                                if (data != null && mAudioTrack != null) {
+                                    mAudioTrack.write(data, data.remaining(), AudioTrack.WRITE_BLOCKING);
+                                }
 
-                            // If nearing buffer underflow, feed
-                            if (mSamplesRemainingFrames() <= mFeedThreshold && mDidInvokeFeedCallback == false) {
-                                mDidInvokeFeedCallback = true;
-                                mainThreadHandler.post(() -> invokeFeedCallback());
+                                // If nearing buffer underflow, feed
+                                if (mSamplesRemainingFrames() <= mFeedThreshold && mDidInvokeFeedCallback == false) {
+                                    mDidInvokeFeedCallback = true;
+                                    mainThreadHandler.post(() -> invokeFeedCallback());
+                                }
                             }
                         }
+                        // avoid excessive CPU usage
+                        Thread.sleep(5);
+                    } catch (InterruptedException e) {
                     }
-                    // avoid excessive CPU usage
-                    Thread.sleep(5); 
-                } catch (InterruptedException e) {
                 }
             }
         });
@@ -296,7 +298,7 @@ public class FlutterPcmSoundPlugin implements
             playbackRunning = false;
             playbackThread.interrupt();
             try {
-                playbackThread.join(1);
+                playbackThread.join();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
