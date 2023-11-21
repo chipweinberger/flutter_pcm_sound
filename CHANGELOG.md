@@ -1,5 +1,8 @@
+## 1.1.0
+* **[Fix]** android: fix crash when `release` is called
+
 ## 1.0.1
-* *readme
+* **[Readme]** update
 
 ## 1.0.0
-* Initial Release.
+* **[Feature]** Initial Release.
