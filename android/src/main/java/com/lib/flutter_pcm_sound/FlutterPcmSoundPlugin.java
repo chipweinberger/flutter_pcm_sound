@@ -130,7 +130,9 @@ public class FlutterPcmSoundPlugin implements
                         mMinBufferSize,
                         AudioTrack.MODE_STREAM);
                 }
-
+                playbackSuspended = true;
+                playbackRunning = true;
+                mDidInvokeFeedCallback =false;
                 startPlaybackThread();
 
                 result.success(true);
@@ -235,6 +237,7 @@ public class FlutterPcmSoundPlugin implements
 
     private void cleanup() {
         if (mAudioTrack != null) {
+            mAudioTrack.flush();
             mAudioTrack.release();
             mAudioTrack = null;
         }
@@ -255,30 +258,32 @@ public class FlutterPcmSoundPlugin implements
                 synchronized (playbackLock) {
                     while (playbackSuspended) {
                         try {
-                            playbackLock.wait();
+                            playbackLock.wait(); 
                         } catch (InterruptedException e) {
                             Thread.currentThread().interrupt();
                         }
                     }
                 }
-                try {
-                    if (mIsPlaying) {
-                        while (mSamplesIsEmpty() == false) {
-                            ByteBuffer data = mSamplesPop().duplicate();
-                            if (data != null && mAudioTrack != null) {
-                                mAudioTrack.write(data, data.remaining(), AudioTrack.WRITE_BLOCKING);
-                            }
+                if (playbackRunning) { 
+                    try {
+                        if (mIsPlaying) {
+                            while (mSamplesIsEmpty() == false) {
+                                ByteBuffer data = mSamplesPop().duplicate();
+                                if (data != null && mAudioTrack != null) {
+                                    mAudioTrack.write(data, data.remaining(), AudioTrack.WRITE_BLOCKING);
+                                }
 
-                            // If nearing buffer underflow, feed
-                            if (mSamplesRemainingFrames() <= mFeedThreshold && mDidInvokeFeedCallback == false) {
-                                mDidInvokeFeedCallback = true;
-                                mainThreadHandler.post(() -> invokeFeedCallback());
+                                // If nearing buffer underflow, feed
+                                if (mSamplesRemainingFrames() <= mFeedThreshold && mDidInvokeFeedCallback == false) {
+                                    mDidInvokeFeedCallback = true;
+                                    mainThreadHandler.post(() -> invokeFeedCallback());
+                                }
                             }
                         }
+                        // avoid excessive CPU usage
+                        Thread.sleep(5);
+                    } catch (InterruptedException e) {
                     }
-                    // avoid excessive CPU usage
-                    Thread.sleep(5); 
-                } catch (InterruptedException e) {
                 }
             }
         });
@@ -289,6 +294,7 @@ public class FlutterPcmSoundPlugin implements
 
     private void stopPlaybackThread() {
         if (playbackThread != null) {
+            playbackSuspended = false;
             playbackRunning = false;
             playbackThread.interrupt();
             try {
