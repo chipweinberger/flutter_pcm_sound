@@ -38,9 +38,9 @@ public class FlutterPcmSoundPlugin implements
 
     private Handler mainThreadHandler = new Handler(Looper.getMainLooper());
     private Thread playbackThread;
-    private final Object playbackLock = new Object();
-    private boolean playbackSuspended = true;
-    private boolean playbackRunning = true;
+    private boolean shouldPlaybackThreadSuspend = true;
+    private boolean shouldPlaybackThreadLoop = true;
+    private final Object suspensionLock = new Object();
     
     private AudioTrack mAudioTrack;
     private int mNumChannels;
@@ -130,8 +130,8 @@ public class FlutterPcmSoundPlugin implements
                         mMinBufferSize,
                         AudioTrack.MODE_STREAM);
                 }
-                playbackSuspended = true;
-                playbackRunning = true;
+                shouldPlaybackThreadSuspend = true;
+                shouldPlaybackThreadLoop = true;
                 mDidInvokeFeedCallback =false;
                 startPlaybackThread();
 
@@ -253,18 +253,20 @@ public class FlutterPcmSoundPlugin implements
     private void startPlaybackThread() {
         playbackThread = new Thread(() -> {
             android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_AUDIO);
-            while (playbackRunning) {
+            while (shouldPlaybackThreadLoop) {
                 // suspend / resume
-                synchronized (playbackLock) {
-                    while (playbackSuspended) {
+                synchronized (suspensionLock) {
+                    while (shouldPlaybackThreadSuspend) {
                         try {
-                            playbackLock.wait(); 
+                            suspensionLock.wait(); 
                         } catch (InterruptedException e) {
                             Thread.currentThread().interrupt();
                         }
                     }
                 }
-                if (playbackRunning) { 
+                // this var can change anytime, so we 
+                // recheck it after the above suspension
+                if (shouldPlaybackThreadLoop) { 
                     try {
                         if (mIsPlaying) {
                             while (mSamplesIsEmpty() == false) {
@@ -294,8 +296,8 @@ public class FlutterPcmSoundPlugin implements
 
     private void stopPlaybackThread() {
         if (playbackThread != null) {
-            playbackSuspended = false;
-            playbackRunning = false;
+            shouldPlaybackThreadSuspend = false;
+            shouldPlaybackThreadLoop = false;
             playbackThread.interrupt();
             try {
                 playbackThread.join();
@@ -307,15 +309,15 @@ public class FlutterPcmSoundPlugin implements
     }
 
     public void suspendPlaybackThread() {
-        synchronized (playbackLock) {
-            playbackSuspended = true;
+        synchronized (suspensionLock) {
+            shouldPlaybackThreadSuspend = true;
         }
     }
 
     public void resumePlaybackThread() {
-        synchronized (playbackLock) {
-            playbackSuspended = false;
-            playbackLock.notify();
+        synchronized (suspensionLock) {
+            shouldPlaybackThreadSuspend = false;
+            suspensionLock.notify();
         }
     }
 
