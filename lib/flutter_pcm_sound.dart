@@ -11,7 +11,8 @@ enum LogLevel {
 }
 
 class FlutterPcmSound {
-  static const MethodChannel _channel = const MethodChannel('flutter_pcm_sound/methods');
+  static const MethodChannel _channel =
+      const MethodChannel('flutter_pcm_sound/methods');
 
   static Function(int)? onFeedSamplesCallback;
 
@@ -24,10 +25,16 @@ class FlutterPcmSound {
   }
 
   /// setup audio
-  static Future<void> setup({required int sampleRate, required int channelCount}) async {
+  /// 'enableBackgroundAudio' specific to iOS,
+  /// enabled by default on other platforms
+  static Future<void> setup(
+      {required int sampleRate,
+      required int channelCount,
+      bool enableBackgroundAudio = false}) async {
     return await _invokeMethod('setup', {
       'sample_rate': sampleRate,
       'num_channels': channelCount,
+      'enable_background_audio': enableBackgroundAudio,
     });
   }
 
@@ -53,14 +60,16 @@ class FlutterPcmSound {
 
   /// queue 16-bit samples (little endian)
   static Future<void> feed(PcmArrayInt16 buffer) async {
-    return await _invokeMethod('feed', {'buffer': buffer.bytes.buffer.asUint8List()});
+    return await _invokeMethod(
+        'feed', {'buffer': buffer.bytes.buffer.asUint8List()});
   }
 
   /// set the threshold at which we call the
   /// feed callback. i.e. if we have less than X
   /// queued frames, the feed callback will be invoked
   static Future<void> setFeedThreshold(int threshold) async {
-    return await _invokeMethod('setFeedThreshold', {'feed_threshold': threshold});
+    return await _invokeMethod(
+        'setFeedThreshold', {'feed_threshold': threshold});
   }
 
   /// callback is invoked when the audio buffer
@@ -86,7 +95,8 @@ class FlutterPcmSound {
       if (method == 'feed') {
         Uint8List data = arguments['buffer'];
         if (data.lengthInBytes > 6) {
-          args = '(${data.lengthInBytes ~/ 2} samples) ${data.sublist(0, 6)} ...';
+          args =
+              '(${data.lengthInBytes ~/ 2} samples) ${data.sublist(0, 6)} ...';
         } else {
           args = '(${data.lengthInBytes ~/ 2} samples) $data';
         }
@@ -159,8 +169,17 @@ class MajorScale {
 
   // C Major Scale (Just Intonation)
   List<double> get scale {
-    List<double> c = [261.63, 294.33, 327.03, 348.83, 392.44, 436.05, 490.55, 523.25];
-    return [c[0]] +  c + c.reversed.toList().sublist(0, c.length-1);
+    List<double> c = [
+      261.63,
+      294.33,
+      327.03,
+      348.83,
+      392.44,
+      436.05,
+      490.55,
+      523.25
+    ];
+    return [c[0]] + c + c.reversed.toList().sublist(0, c.length - 1);
   }
 
   // total periods needed to play the entire note
@@ -192,14 +211,19 @@ class MajorScale {
   }
 
   // generate a sine wave
-  List<int> sineWave({int periods = 1, int sampleRate = 44100, double freq = 440, double volume = 0.5}) {
+  List<int> sineWave(
+      {int periods = 1,
+      int sampleRate = 44100,
+      double freq = 440,
+      double volume = 0.5}) {
     final period = 1.0 / freq;
     final nFramesPerPeriod = (period * sampleRate).toInt();
     final totalFrames = nFramesPerPeriod * periods;
     final step = math.pi * 2 / nFramesPerPeriod;
     List<int> data = List.filled(totalFrames, 0);
     for (int i = 0; i < totalFrames; i++) {
-      data[i] = (math.sin(step * (i % nFramesPerPeriod)) * volume * 32767).toInt();
+      data[i] =
+          (math.sin(step * (i % nFramesPerPeriod)) * volume * 32767).toInt();
     }
     return data;
   }
@@ -213,7 +237,8 @@ class MajorScale {
     List<int> frames = [];
     for (int i = 0; i < periods; i++) {
       _periodCount %= _periodsForScale;
-      frames += sineWave(periods: 1, sampleRate: sampleRate, freq: scale[noteIdx]);
+      frames +=
+          sineWave(periods: 1, sampleRate: sampleRate, freq: scale[noteIdx]);
       _periodCount++;
     }
     return frames;
