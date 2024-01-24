@@ -60,23 +60,25 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 
             self.mNumChannels = [numChannels intValue];
 	    
-	    // handle background audio in iOS
-	    NSError *error = nil;
-            [[AVAudioSession sharedInstance] setCategory:AVAudioSessionCategoryPlayback error:&error];
-            if (error) {
-                NSLog(@"Error setting AVAudioSessionCategoryPlayback: %@", error);
-                result([FlutterError errorWithCode:@"AVAudioSessionError" 
-                                        message:@"Error setting AVAudioSessionCategoryPlayback" 
-                                        details:[error localizedDescription]]);
-                return;
-            }
-            [[AVAudioSession sharedInstance] setActive:YES error:&error];
-            if (error) {
-                NSLog(@"Error activating AVAudioSession: %@", error);
-                result([FlutterError errorWithCode:@"AVAudioSessionError" 
-                                        message:@"Error activating AVAudioSession" 
-                                        details:[error localizedDescription]]);
-                return;
+	        // handle background audio in iOS
+	        NSError *error = nil;
+            if ([enableBackgroundAudio boolValue]) {
+                [[AVAudioSession sharedInstance] setCategory:AVAudioSessionCategoryPlayback error:&error];
+                if (error) {
+                    NSLog(@"Error setting AVAudioSessionCategoryPlayback: %@", error);
+                    result([FlutterError errorWithCode:@"AVAudioSessionError" 
+                                            message:@"Error setting AVAudioSessionCategoryPlayback" 
+                                            details:[error localizedDescription]]);
+                    return;
+                }
+                [[AVAudioSession sharedInstance] setActive:YES error:&error];
+                if (error) {
+                    NSLog(@"Error activating AVAudioSession: %@", error);
+                    result([FlutterError errorWithCode:@"AVAudioSessionError" 
+                                            message:@"Error activating AVAudioSession" 
+                                            details:[error localizedDescription]]);
+                    return;
+                }
             }
 
             // cleanup
