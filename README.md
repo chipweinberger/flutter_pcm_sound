@@ -10,6 +10,12 @@ Send real-time PCM audio (16-bit integer) to your device speakers, from your Flu
 
 FlutterPcmSound has zero dependencies besides Flutter, Android, iOS, and MacOS themselves.
 
+# No Audio Files
+
+Most sound plugins use audio files. You store them in your `assets` folder, load, and then play them. [example: sound_pool](https://pub.dev/packages/soundpool)
+
+`flutter_pcm_sound` is for music apps that generate the audio in realtime a few milliseconds before you hear it. 
+
 ## Callback Based, For Real-Time Audio
 
 In contrast to [raw_sound](https://pub.dev/packages/raw_sound), FlutterPcmSound uses a callback `setFeedCallback` to signal when to feed more samples.
