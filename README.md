@@ -12,7 +12,7 @@ FlutterPcmSound has zero dependencies besides Flutter, Android, iOS, and MacOS t
 
 ## No Audio Files
 
-Most sound plugins use audio files. You store them in your `assets` folder, load, and then play them. [example: sound_pool](https://pub.dev/packages/soundpool)
+Most sound plugins use audio files. You store them in your `assets` folder, load, and then play them. e.g. [sound_pool](https://pub.dev/packages/soundpool)
 
 `flutter_pcm_sound` is for music apps that generate the audio in realtime a few milliseconds before you hear it. 
 
