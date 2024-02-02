@@ -270,7 +270,10 @@ public class FlutterPcmSoundPlugin implements
                     try {
                         if (mIsPlaying) {
                             while (mSamplesIsEmpty() == false) {
-                                ByteBuffer data = mSamplesPop().duplicate();
+                                ByteBuffer data = mSamplesPop();
+                                if(data != null) {
+                                    data = data.duplicate();
+                                }
                                 if (data != null && mAudioTrack != null) {
                                     mAudioTrack.write(data, data.remaining(), AudioTrack.WRITE_BLOCKING);
                                 }
