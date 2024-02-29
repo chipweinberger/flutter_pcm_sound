@@ -1,3 +1,6 @@
+## 1.2.0
+* **[Feature]** iOS: add support for AVAudioSessionCategory
+
 ## 1.1.0
 * **[Fix]** android: fix crash when `release` is called
 
