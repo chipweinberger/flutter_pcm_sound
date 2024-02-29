@@ -1,6 +1,10 @@
 #import "FlutterPcmSoundPlugin.h"
 #import <AudioToolbox/AudioToolbox.h>
 
+#if TARGET_OS_IOS
+#import <AVFoundation/AVFoundation.h>
+#endif
+
 #define kOutputBus 0
 #define NAMESPACE @"flutter_pcm_sound" // Assuming this is the namespace you want
 
@@ -55,31 +59,46 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
         else if ([@"setup" isEqualToString:call.method])
         {
             NSDictionary *args = (NSDictionary*)call.arguments;
-            NSNumber *sampleRate  = args[@"sample_rate"];
-            NSNumber *numChannels = args[@"num_channels"];
+            NSNumber *sampleRate       = args[@"sample_rate"];
+            NSNumber *numChannels      = args[@"num_channels"];
+            NSString *iosAudioCategory = args[@"ios_audio_category"];
 
             self.mNumChannels = [numChannels intValue];
 	    
 	        // handle background audio in iOS
 	        NSError *error = nil;
-            if ([enableBackgroundAudio boolValue]) {
-                [[AVAudioSession sharedInstance] setCategory:AVAudioSessionCategoryPlayback error:&error];
-                if (error) {
-                    NSLog(@"Error setting AVAudioSessionCategoryPlayback: %@", error);
-                    result([FlutterError errorWithCode:@"AVAudioSessionError" 
-                                            message:@"Error setting AVAudioSessionCategoryPlayback" 
-                                            details:[error localizedDescription]]);
-                    return;
-                }
-                [[AVAudioSession sharedInstance] setActive:YES error:&error];
-                if (error) {
-                    NSLog(@"Error activating AVAudioSession: %@", error);
-                    result([FlutterError errorWithCode:@"AVAudioSessionError" 
-                                            message:@"Error activating AVAudioSession" 
-                                            details:[error localizedDescription]]);
-                    return;
-                }
+
+#if TARGET_OS_IOS
+            // Default to Playback if no matching case is found
+            AVAudioSessionCategory category = AVAudioSessionCategorySoloAmbient;
+            if ([iosAudioCategory isEqualToString:@"ambient"]) {
+                category = AVAudioSessionCategoryAmbient;
+            } else if ([iosAudioCategory isEqualToString:@"soloAmbient"]) {
+                category = AVAudioSessionCategorySoloAmbient;
+            } else if ([iosAudioCategory isEqualToString:@"playback"]) {
+                category = AVAudioSessionCategoryPlayback;
             }
+            
+            // Set the AVAudioSession category based on the string value
+            [[AVAudioSession sharedInstance] setCategory:category error:&error];
+            if (error) {
+                NSLog(@"Error setting AVAudioSession category: %@", error);
+                result([FlutterError errorWithCode:@"AVAudioSessionError" 
+                                        message:@"Error setting AVAudioSession category" 
+                                        details:[error localizedDescription]]);
+                return;
+            }
+            
+            // Activate the audio session
+            [[AVAudioSession sharedInstance] setActive:YES error:&error];
+            if (error) {
+                NSLog(@"Error activating AVAudioSession: %@", error);
+                result([FlutterError errorWithCode:@"AVAudioSessionError" 
+                                        message:@"Error activating AVAudioSession" 
+                                        details:[error localizedDescription]]);
+                return;
+            }
+#endif
 
             // cleanup
             if (_mAudioUnit != nil) {
