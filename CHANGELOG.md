@@ -1,5 +1,5 @@
 ## 1.2.1
-* **[Fix]** Android: Fix crash that happens when releasing PCM player
+* **[Fix]** Android: Fix crash when releasing PCM player
 
 ## 1.2.0
 * **[Feature]** iOS: add support for AVAudioSessionCategory
