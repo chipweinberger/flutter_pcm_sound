@@ -236,12 +236,12 @@ public class FlutterPcmSoundPlugin implements
     }
 
     private void cleanup() {
+        stopPlaybackThread();
         if (mAudioTrack != null) {
             mAudioTrack.flush();
             mAudioTrack.release();
             mAudioTrack = null;
         }
-        stopPlaybackThread();
     }
 
     private void invokeFeedCallback() {
