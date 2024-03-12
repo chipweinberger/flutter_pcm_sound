@@ -61,14 +61,14 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
             NSDictionary *args = (NSDictionary*)call.arguments;
             NSNumber *sampleRate       = args[@"sample_rate"];
             NSNumber *numChannels      = args[@"num_channels"];
+#if TARGET_OS_IOS
             NSString *iosAudioCategory = args[@"ios_audio_category"];
+#endif
 
             self.mNumChannels = [numChannels intValue];
-	    
-	        // handle background audio in iOS
-	        NSError *error = nil;
 
 #if TARGET_OS_IOS
+	        // handle background audio in iOS
             // Default to Playback if no matching case is found
             AVAudioSessionCategory category = AVAudioSessionCategorySoloAmbient;
             if ([iosAudioCategory isEqualToString:@"ambient"]) {
@@ -80,6 +80,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
             }
             
             // Set the AVAudioSession category based on the string value
+            NSError *error = nil;
             [[AVAudioSession sharedInstance] setCategory:category error:&error];
             if (error) {
                 NSLog(@"Error setting AVAudioSession category: %@", error);
