@@ -1,3 +1,6 @@
+## 1.2.2
+* **[Fix]** MacOS: fix warnings
+
 ## 1.2.1
 * **[Fix]** Android: Fix crash when releasing PCM player
 
