@@ -14,7 +14,7 @@ FlutterPcmSound has zero dependencies besides Flutter, Android, iOS, and MacOS t
 
 Unlike other plugins, `flutter_pcm_sound` does *not* use audio files (For example: [sound_pool](https://pub.dev/packages/soundpool)).
 
-Instead, `flutter_pcm_sound` is for music apps that generate audio in realtime a few milliseconds before you hear it. For example, using [dart_melty_soundfont](https://pub.dev/packages/dart_melty_soundfont).
+Instead, `flutter_pcm_sound` is for apps that generate audio in realtime a few milliseconds before you hear it. For example, using [dart_melty_soundfont](https://pub.dev/packages/dart_melty_soundfont).
 
 ## Callback Based, For Real-Time Audio
 
