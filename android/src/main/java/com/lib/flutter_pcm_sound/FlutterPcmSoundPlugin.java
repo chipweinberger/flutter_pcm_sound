@@ -88,6 +88,7 @@ public class FlutterPcmSoundPlugin implements
         switch (call.method) {
             case "setLogLevel":
                 // Handle setLogLevel
+                result.success(true);
                 break;
             case "setup":
                 int sampleRate = call.argument("sample_rate");
