@@ -1,3 +1,6 @@
+## 1.2.6
+* **[Improve]** Android: continue to refine htz
+
 ## 1.2.5
 * **[Improve]** Android: target 100htz when feed theshold is not set
 
