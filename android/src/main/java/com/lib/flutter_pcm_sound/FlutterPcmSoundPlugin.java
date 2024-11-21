@@ -39,7 +39,7 @@ public class FlutterPcmSoundPlugin implements
     private Handler mainThreadHandler = new Handler(Looper.getMainLooper());
     private Thread playbackThread;
     private boolean shouldPlaybackThreadSuspend = true;
-    private boolean shouldPlaybackThreadLoop = true;
+    private boolean shouldPlaybackThreadStop = false;
     private final Object suspensionLock = new Object();
     
     private AudioTrack mAudioTrack;
@@ -132,7 +132,7 @@ public class FlutterPcmSoundPlugin implements
                         AudioTrack.MODE_STREAM);
                 }
                 shouldPlaybackThreadSuspend = true;
-                shouldPlaybackThreadLoop = true;
+                shouldPlaybackThreadStop = false;
                 mDidInvokeFeedCallback =false;
                 startPlaybackThread();
 
@@ -255,7 +255,7 @@ public class FlutterPcmSoundPlugin implements
         playbackThread = new Thread(() -> {
             android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_AUDIO);
             long prevFeedTime = 0;
-            while (shouldPlaybackThreadLoop) {
+            while (!shouldPlaybackThreadStop) {
                 // suspend / resume
                 synchronized (suspensionLock) {
                     while (shouldPlaybackThreadSuspend) {
@@ -268,7 +268,7 @@ public class FlutterPcmSoundPlugin implements
                 }
                 // this var can change anytime, so we 
                 // recheck it after the above suspension
-                if (shouldPlaybackThreadLoop) { 
+                if (!shouldPlaybackThreadStop) { 
                     try {
                         if (mIsPlaying) {
                             while (mSamplesIsEmpty() == false) {
@@ -313,7 +313,7 @@ public class FlutterPcmSoundPlugin implements
     private void stopPlaybackThread() {
         if (playbackThread != null) {
             shouldPlaybackThreadSuspend = false;
-            shouldPlaybackThreadLoop = false;
+            shouldPlaybackThreadStop = true;
             playbackThread.interrupt();
             try {
                 playbackThread.join();
