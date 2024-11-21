@@ -307,15 +307,16 @@ static OSStatus RenderCallback(void *inRefCon,
 
         remainingFrames = [instance.mSamples length] / (instance.mNumChannels * sizeof(short));
 
-        if (remainingFrames <= instance.mFeedThreshold) { 
-            if (instance.mDidInvokeFeedCallback == false) {
-                instance.mDidInvokeFeedCallback = true;
-                shouldRequestMore = true;
-            }
+        // should request more frames?
+        if (instance.mFeedThreshold == -1) {
+            shouldRequestMore = true;
+        } else {
+            shouldRequestMore = remainingFrames <= instance.mFeedThreshold && !instance.mDidInvokeFeedCallback;
         }
     }
 
     if (shouldRequestMore) { 
+        instance.mDidInvokeFeedCallback = true;
         NSDictionary *response = @{@"remaining_frames": @(remainingFrames)};
         dispatch_async(dispatch_get_main_queue(), ^{
             [instance.mMethodChannel invokeMethod:@"OnFeedSamples" arguments:response];

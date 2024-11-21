@@ -8,6 +8,7 @@ import android.media.AudioTrack;
 import android.media.AudioAttributes;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 
 import androidx.annotation.NonNull;
 
@@ -29,8 +30,7 @@ public class FlutterPcmSoundPlugin implements
     FlutterPlugin,
     MethodChannel.MethodCallHandler
 {
-    private final int MAX_FRAMES_PER_BUFFER = 100;
-    private final int FRAMES_PER_NOTIFICATION = 500;
+    private final int MAX_FRAMES_PER_BUFFER = 500;
 
     private static final String TAG = "[PCM-Android]";
     private static final String CHANNEL_NAME = "flutter_pcm_sound/methods";
@@ -254,6 +254,7 @@ public class FlutterPcmSoundPlugin implements
     private void startPlaybackThread() {
         playbackThread = new Thread(() -> {
             android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_AUDIO);
+            long prevFeedTime = 0;
             while (shouldPlaybackThreadLoop) {
                 // suspend / resume
                 synchronized (suspensionLock) {
@@ -279,8 +280,19 @@ public class FlutterPcmSoundPlugin implements
                                     mAudioTrack.write(data, data.remaining(), AudioTrack.WRITE_BLOCKING);
                                 }
 
-                                // If nearing buffer underflow, feed
-                                if (mSamplesRemainingFrames() <= mFeedThreshold && mDidInvokeFeedCallback == false) {
+                                long now = SystemClock.elapsedRealtime();
+
+                                // should request more frames?
+                                boolean shouldRequestMore = false;
+                                if (mFeedThreshold == -1) {
+                                    shouldRequestMore = now - prevFeedTime >= 4; // ~250htz max (30htz typical)
+                                } else {
+                                    shouldRequestMore = mSamplesRemainingFrames() <= mFeedThreshold && !mDidInvokeFeedCallback;
+                                }
+
+                                // request feed
+                                if (shouldRequestMore) {
+                                    prevFeedTime = now;
                                     mDidInvokeFeedCallback = true;
                                     mainThreadHandler.post(() -> invokeFeedCallback());
                                 }
