@@ -1,3 +1,6 @@
+## 1.2.5
+* **[Improve]** Android: target 100htz when feed theshold is not set
+
 ## 1.2.4
 * **[Feature]** `setFeedThreshold(-1)` will ignore the threshold 
 
