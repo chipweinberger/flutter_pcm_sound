@@ -28,7 +28,11 @@ You can also manually `feed` whenever you like.
 
 To monitor remaining samples in real-time, you can use `setFeedThreshold(-1)`.
 
-We will invoke your callback ~100 times per second regardless of how many samples remain.
+We will invoke your callback 30-100 times per second regardless of how many samples remain.
+
+iOS is a stable ~100htz.
+
+Android is less predictable. Figure around ~30-60htz.
 
 ## Usage
 

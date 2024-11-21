@@ -30,7 +30,7 @@ public class FlutterPcmSoundPlugin implements
     FlutterPlugin,
     MethodChannel.MethodCallHandler
 {
-    private final int MAX_FRAMES_PER_BUFFER = 500;
+    private final int MAX_FRAMES_PER_BUFFER = 250;
 
     private static final String TAG = "[PCM-Android]";
     private static final String CHANNEL_NAME = "flutter_pcm_sound/methods";
@@ -280,12 +280,12 @@ public class FlutterPcmSoundPlugin implements
                                     mAudioTrack.write(data, data.remaining(), AudioTrack.WRITE_BLOCKING);
                                 }
 
-                                long now = SystemClock.elapsedRealtime();
+                                long now = SystemClock.elapsedRealtimeNanos();
 
                                 // should request more frames?
                                 boolean shouldRequestMore = false;
                                 if (mFeedThreshold == -1) {
-                                    shouldRequestMore = now - prevFeedTime >= 1; // ~1000htz max (100htz typical)
+                                    shouldRequestMore = now - prevFeedTime >= 8000000; // ~125htz max (30htz typical)
                                 } else {
                                     shouldRequestMore = mSamplesRemainingFrames() <= mFeedThreshold && !mDidInvokeFeedCallback;
                                 }
@@ -299,7 +299,7 @@ public class FlutterPcmSoundPlugin implements
                             }
                         }
                         // avoid excessive CPU usage
-                        Thread.sleep(5);
+                        Thread.sleep(4);
                     } catch (InterruptedException e) {
                     }
                 }
