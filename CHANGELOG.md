@@ -1,3 +1,6 @@
+## 1.2.7
+* **[Fix]** Example: accidentally pushed changes
+
 ## 1.2.6
 * **[Improve]** Android: continue to refine htz
 
