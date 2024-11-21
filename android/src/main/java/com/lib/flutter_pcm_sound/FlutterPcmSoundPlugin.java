@@ -285,7 +285,7 @@ public class FlutterPcmSoundPlugin implements
                                 // should request more frames?
                                 boolean shouldRequestMore = false;
                                 if (mFeedThreshold == -1) {
-                                    shouldRequestMore = now - prevFeedTime >= 4; // ~250htz max (30htz typical)
+                                    shouldRequestMore = now - prevFeedTime >= 1; // ~1000htz max (100htz typical)
                                 } else {
                                     shouldRequestMore = mSamplesRemainingFrames() <= mFeedThreshold && !mDidInvokeFeedCallback;
                                 }
