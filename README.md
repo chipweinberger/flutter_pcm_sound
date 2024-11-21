@@ -24,6 +24,12 @@ You can lower the feed threshold using `setFeedThreshold` to achieve real time a
 
 You can also manually `feed` whenever you like.
 
+## ignore feed threshold
+
+To monitor remaining samples in real-time, you can use `setFeedThreshold(-1)`.
+
+We will invoke your callback 30 to 100 times per second regardless of how many samples remain.
+
 ## Usage
 
 ```dart

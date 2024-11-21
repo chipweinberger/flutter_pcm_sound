@@ -1,3 +1,6 @@
+## 1.2.4
+* **[Feature]** `setFeedThreshold(-1)` will ignore the threshold 
+
 ## 1.2.3
 * **[Fix]** Android: setLogLevel would hang
 
