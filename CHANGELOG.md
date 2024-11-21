@@ -1,3 +1,6 @@
+## 1.2.3
+* **[Fix]** Android: setLogLevel would hang
+
 ## 1.2.2
 * **[Fix]** MacOS: fix warnings
 
