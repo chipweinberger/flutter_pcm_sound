@@ -1,6 +1,5 @@
 package com.lib.flutter_pcm_sound;
 
-import android.util.Log;
 import android.os.Build;
 import android.media.AudioFormat;
 import android.media.AudioManager;
@@ -12,13 +11,14 @@ import android.os.SystemClock;
 
 import androidx.annotation.NonNull;
 
+import java.util.Map;
+import java.util.HashMap;
 import java.util.List;
 import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.io.StringWriter;
+import java.io.PrintWriter;
 import java.nio.ByteBuffer;
 
 import io.flutter.embedding.engine.plugins.FlutterPlugin;
@@ -26,33 +26,41 @@ import io.flutter.plugin.common.BinaryMessenger;
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
 
+/**
+ * FlutterPcmSoundPlugin implements a "one pedal" PCM sound playback mechanism.
+ * Playback starts automatically when samples are fed and stops when no more samples are available.
+ */
 public class FlutterPcmSoundPlugin implements
     FlutterPlugin,
     MethodChannel.MethodCallHandler
 {
-    private final int MAX_FRAMES_PER_BUFFER = 250;
-
-    private static final String TAG = "[PCM-Android]";
     private static final String CHANNEL_NAME = "flutter_pcm_sound/methods";
-    private MethodChannel mMethodChannel;
+    private static final int MAX_FRAMES_PER_BUFFER = 250;
 
+    private MethodChannel mMethodChannel;
     private Handler mainThreadHandler = new Handler(Looper.getMainLooper());
     private Thread playbackThread;
-    private boolean shouldPlaybackThreadSuspend = true;
-    private boolean shouldPlaybackThreadStop = false;
-    private final Object suspensionLock = new Object();
-    
+    private volatile boolean mShouldCleanup = false;
+
     private AudioTrack mAudioTrack;
     private int mNumChannels;
     private int mMinBufferSize;
-    private int mPlayState;
-    private boolean mIsPlaying;
 
     private long mFeedThreshold = 8000;
-    private boolean mDidInvokeFeedCallback = false;
+    private volatile boolean mDidInvokeFeedCallback = false;
 
-    private LinkedList<ByteBuffer> mSamples = new LinkedList<>();
-    private final Lock samplesLock = new ReentrantLock();
+    // Thread-safe queue for storing audio samples
+    private final LinkedBlockingQueue<ByteBuffer> mSamples = new LinkedBlockingQueue<>();
+
+    // Log level enum (kept for potential future use)
+    private enum LogLevel {
+        NONE,
+        ERROR,
+        STANDARD,
+        VERBOSE
+    }
+
+    private LogLevel mLogLevel = LogLevel.VERBOSE;
 
     @Override
     public void onAttachedToEngine(@NonNull FlutterPluginBinding binding) {
@@ -68,254 +76,142 @@ public class FlutterPcmSoundPlugin implements
     }
 
     @Override
-    @SuppressWarnings("deprecation") // needed for compatability with android < 23
+    @SuppressWarnings("deprecation") // Needed for compatibility with Android < 23
     public void onMethodCall(@NonNull MethodCall call, @NonNull MethodChannel.Result result) {
-
-        // ensure setup
-        switch (call.method) {
-            case "play":
-            case "stop":
-            case "clear":
-            case "feed": {
-                if (mAudioTrack == null) {
-                    result.error("mAudioTrackNull", "you must call setup()", null);
-                    return;
+        try {
+            switch (call.method) {
+                case "setLogLevel": {
+                    result.success(true);
+                    break;
                 }
-            }
-        }
+                case "setup": {
+                    Integer sampleRateObj = call.argument("sample_rate");
+                    Integer numChannelsObj = call.argument("num_channels");
 
-        switch (call.method) {
-            case "setLogLevel":
-                // Handle setLogLevel
-                result.success(true);
-                break;
-            case "setup":
-                int sampleRate = call.argument("sample_rate");
-                mNumChannels = call.argument("num_channels");
+                    if (sampleRateObj == null || numChannelsObj == null) {
+                        result.error("InvalidArguments", "sample_rate and num_channels are required.", null);
+                        return;
+                    }
 
-                // cleanup
-                if (mAudioTrack != null) {
-                    cleanup();
-                }
+                    int sampleRate = sampleRateObj;
+                    mNumChannels = numChannelsObj;
 
-                int channelConfig = (mNumChannels == 2) ? 
-                    AudioFormat.CHANNEL_OUT_STEREO :
-                    AudioFormat.CHANNEL_OUT_MONO;
+                    // Cleanup existing resources if any
+                    if (mAudioTrack != null) {
+                        cleanup();
+                    }
 
-                mMinBufferSize = AudioTrack.getMinBufferSize(
-                    sampleRate, channelConfig, AudioFormat.ENCODING_PCM_16BIT);
+                    int channelConfig = (mNumChannels == 2) ?
+                        AudioFormat.CHANNEL_OUT_STEREO :
+                        AudioFormat.CHANNEL_OUT_MONO;
 
-                Log.d(TAG, "minBufferSize: " + (mMinBufferSize/(2*mNumChannels)) + " frames");
+                    mMinBufferSize = AudioTrack.getMinBufferSize(
+                        sampleRate, channelConfig, AudioFormat.ENCODING_PCM_16BIT);
 
-                if (Build.VERSION.SDK_INT >= 23) { // Android 6 (August 2015)
-                    mAudioTrack = new AudioTrack.Builder()
-                        .setAudioAttributes(new AudioAttributes.Builder()
-                                .setUsage(AudioAttributes.USAGE_MEDIA)
-                                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                                .build())
-                        .setAudioFormat(new AudioFormat.Builder()
-                                .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                                .setSampleRate(sampleRate)
-                                .setChannelMask(channelConfig)
-                                .build())
-                        .setBufferSizeInBytes(mMinBufferSize)
-                        .setTransferMode(AudioTrack.MODE_STREAM)
-                        .build();
-                } else {
-                    mAudioTrack = new AudioTrack(
-                        AudioManager.STREAM_MUSIC,
-                        sampleRate, 
-                        channelConfig,
-                        AudioFormat.ENCODING_PCM_16BIT,
-                        mMinBufferSize,
-                        AudioTrack.MODE_STREAM);
-                }
-                shouldPlaybackThreadSuspend = true;
-                shouldPlaybackThreadStop = false;
-                mDidInvokeFeedCallback =false;
-                startPlaybackThread();
+                    if (mMinBufferSize == AudioTrack.ERROR || mMinBufferSize == AudioTrack.ERROR_BAD_VALUE) {
+                        result.error("AudioTrackError", "Invalid buffer size.", null);
+                        return;
+                    }
 
-                result.success(true);
-                break;
-            case "play":
-                if (mIsPlaying == false) {
+                    if (Build.VERSION.SDK_INT >= 23) { // Android 6 (Marshmallow) and above
+                        mAudioTrack = new AudioTrack.Builder()
+                            .setAudioAttributes(new AudioAttributes.Builder()
+                                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                                    .build())
+                            .setAudioFormat(new AudioFormat.Builder()
+                                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                                    .setSampleRate(sampleRate)
+                                    .setChannelMask(channelConfig)
+                                    .build())
+                            .setBufferSizeInBytes(mMinBufferSize)
+                            .setTransferMode(AudioTrack.MODE_STREAM)
+                            .build();
+                    } else {
+                        mAudioTrack = new AudioTrack(
+                            AudioManager.STREAM_MUSIC,
+                            sampleRate,
+                            channelConfig,
+                            AudioFormat.ENCODING_PCM_16BIT,
+                            mMinBufferSize,
+                            AudioTrack.MODE_STREAM);
+                    }
+
+                    if (mAudioTrack.getState() != AudioTrack.STATE_INITIALIZED) {
+                        result.error("AudioTrackError", "AudioTrack initialization failed.", null);
+                        mAudioTrack.release();
+                        mAudioTrack = null;
+                        return;
+                    }
+
+                    mSamples.clear();
                     mDidInvokeFeedCallback = false;
-                    invokeFeedCallback();
-                    mAudioTrack.play();
-                    resumePlaybackThread();
-                    mIsPlaying = true;
+                    mShouldCleanup = false;
+
+                    // start playback thread
+                    playbackThread = new Thread(this::playbackThreadLoop, "PCMPlaybackThread");
+                    playbackThread.setPriority(Thread.MAX_PRIORITY);
+                    playbackThread.start();
+
+                    result.success(true);
+                    break;
                 }
-                result.success(true);
-                break;
-            case "stop":
-                boolean clear = (boolean) call.argument("clear");
-                if (mIsPlaying == true) {
-                    mAudioTrack.pause();
-                    suspendPlaybackThread();
-                }
-                mIsPlaying = false;
-                if (clear) {
-                    mSamplesClear();
-                }
-                result.success(true);
-                break;
-            case "clear":
-                mSamplesClear();
-                result.success(true);
-                break;
-            case "feed":
-                byte[] buffer = call.argument("buffer");
-                boolean play = (boolean) call.argument("play");
+                case "feed": {
+                    byte[] buffer = call.argument("buffer");
 
-                // Split into smaller buffers
-                List<ByteBuffer> got = split(buffer, MAX_FRAMES_PER_BUFFER);
-                for (ByteBuffer chunk : got) {
-                    mSamplesPush(chunk);
-                }
-
-                // reset
-                mDidInvokeFeedCallback = false;
-
-                // also start playing
-                if (play && mIsPlaying == false) {
-                    mAudioTrack.play();
-                    resumePlaybackThread();
-                    mIsPlaying = true;
-                }
-
-                result.success(true);
-                break;
-            case "setFeedThreshold":
-                mFeedThreshold = (int) call.argument("feed_threshold");
-                result.success(true);
-                break;
-            case "remainingFrames":
-                result.success(mSamplesRemainingFrames());
-                break;
-            case "release":
-                cleanup();
-                result.success(true);
-                break;
-            default:
-                result.notImplemented();
-                break;
-        }
-    }
-
-    private void mSamplesClear() {
-        samplesLock.lock();
-        mSamples.clear();
-        samplesLock.unlock();
-    }
-
-    private void mSamplesPush(ByteBuffer samples) {
-        samplesLock.lock();
-        mSamples.add(samples);
-        samplesLock.unlock();
-    }
-
-    private ByteBuffer mSamplesPop() {
-        samplesLock.lock();
-        ByteBuffer out =  mSamples.poll();
-        samplesLock.unlock();
-        return out;
-    }
-
-    private boolean mSamplesIsEmpty() {
-        samplesLock.lock();
-        boolean out =  mSamples.isEmpty();
-        samplesLock.unlock();
-        return out;
-    }
-
-    private long mSamplesRemainingFrames() {
-        samplesLock.lock();
-        long totalBytes = 0;
-        for (ByteBuffer sampleBuffer : mSamples) {
-            totalBytes += sampleBuffer.remaining();
-        }
-        samplesLock.unlock();
-        return totalBytes / (2 * mNumChannels);
-    }
-
-    private void cleanup() {
-        stopPlaybackThread();
-        if (mAudioTrack != null) {
-            mAudioTrack.flush();
-            mAudioTrack.release();
-            mAudioTrack = null;
-        }
-    }
-
-    private void invokeFeedCallback() {
-        Map<String, Object> response = new HashMap<>();
-        response.put("remaining_frames", mSamplesRemainingFrames());
-        mMethodChannel.invokeMethod("OnFeedSamples", response);
-    }
-
-    private void startPlaybackThread() {
-        playbackThread = new Thread(() -> {
-            android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_AUDIO);
-            long prevFeedTime = 0;
-            while (!shouldPlaybackThreadStop) {
-                // suspend / resume
-                synchronized (suspensionLock) {
-                    while (shouldPlaybackThreadSuspend) {
-                        try {
-                            suspensionLock.wait(); 
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                        }
+                    if (buffer == null || buffer.length == 0) {
+                        result.error("InvalidArguments", "buffer is required and cannot be empty.", null);
+                        return;
                     }
-                }
-                // this var can change anytime, so we 
-                // recheck it after the above suspension
-                if (!shouldPlaybackThreadStop) { 
-                    try {
-                        if (mIsPlaying) {
-                            while (mSamplesIsEmpty() == false) {
-                                ByteBuffer data = mSamplesPop();
-                                if(data != null) {
-                                    data = data.duplicate();
-                                }
-                                if (data != null && mAudioTrack != null) {
-                                    mAudioTrack.write(data, data.remaining(), AudioTrack.WRITE_BLOCKING);
-                                }
 
-                                long now = SystemClock.elapsedRealtimeNanos();
+                    // Split for better performance
+                    List<ByteBuffer> chunks = split(buffer, MAX_FRAMES_PER_BUFFER);
 
-                                // should request more frames?
-                                boolean shouldRequestMore = false;
-                                if (mFeedThreshold == -1) {
-                                    shouldRequestMore = now - prevFeedTime >= 8000000; // ~125htz max (30htz typical)
-                                } else {
-                                    shouldRequestMore = mSamplesRemainingFrames() <= mFeedThreshold && !mDidInvokeFeedCallback;
-                                }
-
-                                // request feed
-                                if (shouldRequestMore) {
-                                    prevFeedTime = now;
-                                    mDidInvokeFeedCallback = true;
-                                    mainThreadHandler.post(() -> invokeFeedCallback());
-                                }
-                            }
-                        }
-                        // avoid excessive CPU usage
-                        Thread.sleep(4);
-                    } catch (InterruptedException e) {
+                    // Push to mSamples
+                    for (ByteBuffer chunk : chunks) {
+                        mSamples.put(chunk);
                     }
+
+                    // Reset the feed callback flag
+                    mDidInvokeFeedCallback = false;
+
+                    result.success(true);
+                    break;
                 }
+                case "setFeedThreshold": {
+                    mFeedThreshold = ((Number) call.argument("feed_threshold")).longValue();
+                    result.success(true);
+                    break;
+                }
+                case "release": {
+                    cleanup();
+                    result.success(true);
+                    break;
+                }
+                default:
+                    result.notImplemented();
+                    break;
             }
-        });
 
-        playbackThread.setPriority(Thread.MAX_PRIORITY);
-        playbackThread.start();
+
+        } catch (Exception e) {
+            StringWriter sw = new StringWriter();
+            PrintWriter pw = new PrintWriter(sw);
+            e.printStackTrace(pw);
+            String stackTrace = sw.toString();
+            result.error("androidException", e.toString(), stackTrace);
+            return;
+        }
     }
 
-    private void stopPlaybackThread() {
+
+    /**
+     * Cleans up resources by stopping the playback thread and releasing AudioTrack.
+     */
+    private void cleanup() {
+        // stop playback thread
         if (playbackThread != null) {
-            shouldPlaybackThreadSuspend = false;
-            shouldPlaybackThreadStop = true;
+            mShouldCleanup = true;
             playbackThread.interrupt();
             try {
                 playbackThread.join();
@@ -326,43 +222,69 @@ public class FlutterPcmSoundPlugin implements
         }
     }
 
-    public void suspendPlaybackThread() {
-        synchronized (suspensionLock) {
-            shouldPlaybackThreadSuspend = true;
+    /**
+     * Calculates the number of remaining frames in the sample buffer.
+     */
+    private long mRemainingFrames() {
+        long totalBytes = 0;
+        for (ByteBuffer sampleBuffer : mSamples) {
+            totalBytes += sampleBuffer.remaining();
         }
+        return totalBytes / (2 * mNumChannels); // 16-bit PCM
     }
 
-    public void resumePlaybackThread() {
-        synchronized (suspensionLock) {
-            shouldPlaybackThreadSuspend = false;
-            suspensionLock.notify();
-        }
+    /**
+     * Invokes the 'OnFeedSamples' callback with the number of remaining frames.
+     */
+    private void invokeFeedCallback() {
+        long remainingFrames = mRemainingFrames();
+        Map<String, Object> response = new HashMap<>();
+        response.put("remaining_frames", remainingFrames);
+        mMethodChannel.invokeMethod("OnFeedSamples", response);
     }
 
-    private String audioTrackErrorString(int code) {
-        switch (code) {
-            case AudioTrack.ERROR_INVALID_OPERATION:
-                return "ERROR_INVALID_OPERATION";
-            case AudioTrack.ERROR_BAD_VALUE:
-                return "ERROR_BAD_VALUE";
-            case AudioTrack.ERROR_DEAD_OBJECT:
-                return "ERROR_DEAD_OBJECT";
-            case AudioTrack.ERROR:
-                return "GENERIC ERROR";
-            default:
-                return "unknownError(" + code + ")";
+
+    /**
+     * The main loop of the playback thread.
+     */
+    private void playbackThreadLoop() {
+        android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_AUDIO);
+
+        mAudioTrack.play();
+
+        while (!mShouldCleanup) {
+            ByteBuffer data = null;
+            try {
+                // blocks indefinitely until new data
+                data = mSamples.take();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                continue;
+            }
+
+            // write
+            mAudioTrack.write(data, data.remaining(), AudioTrack.WRITE_BLOCKING);
+
+            // invoke feed callback?
+            if (mFeedThreshold == -1 || (mRemainingFrames() <= mFeedThreshold && !mDidInvokeFeedCallback)) {
+                mDidInvokeFeedCallback = true;
+                mainThreadHandler.post(this::invokeFeedCallback);
+            }
         }
+
+        mAudioTrack.stop();
+        mAudioTrack.flush();
+        mAudioTrack.release();
+        mAudioTrack = null;
     }
 
-    // split large array into smaller ones, for better perf
+
     private List<ByteBuffer> split(byte[] buffer, int maxSize) {
         List<ByteBuffer> chunks = new ArrayList<>();
         int offset = 0;
         while (offset < buffer.length) {
             int length = Math.min(buffer.length - offset, maxSize);
-            ByteBuffer b = ByteBuffer.allocate(length);
-            b.put(buffer, offset, length);
-            b.rewind();
+            ByteBuffer b = ByteBuffer.wrap(buffer, offset, length);
             chunks.add(b);
             offset += length;
         }

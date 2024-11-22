@@ -44,26 +44,9 @@ class FlutterPcmSound {
     });
   }
 
-  /// start playback
-  static Future<void> play() async {
-    return await _invokeMethod('play');
-  }
-
-  /// stop playback
-  /// /// - `play`: also clear queued samples
-  static Future<void> stop({bool clear = false}) async {
-    return await _invokeMethod('stop', {'clear': clear});
-  }
-
-  /// clear queued samples
-  static Future<void> clear() async {
-    return await _invokeMethod('clear');
-  }
-
   /// queue 16-bit samples (little endian)
-  /// - `play`: also start playing
-  static Future<void> feed(PcmArrayInt16 buffer, {bool play = false}) async {
-    return await _invokeMethod('feed', {'buffer': buffer.bytes.buffer.asUint8List(), 'play': play});
+  static Future<void> feed(PcmArrayInt16 buffer) async {
+    return await _invokeMethod('feed', {'buffer': buffer.bytes.buffer.asUint8List()});
   }
 
   /// set the threshold at which we call the
@@ -75,14 +58,9 @@ class FlutterPcmSound {
 
   /// callback is invoked when the audio buffer
   /// is in danger of running out of queued samples
-  static void setFeedCallback(Function(int) callback) {
+  static void setFeedCallback(Function(int)? callback) {
     onFeedSamplesCallback = callback;
     _channel.setMethodCallHandler(_methodCallHandler);
-  }
-
-  /// get the number of queued samples remaining
-  static Future<int> remainingFrames() async {
-    return await _invokeMethod('remainingFrames');
   }
 
   /// release all audio resources
@@ -219,11 +197,11 @@ class MajorScale {
   }
 
   // generate the next X periods of the major scale
-  List<int> generate({required int periods}) {
+  List<int> generate({required int periods, double volume = 1.0}) {
     List<int> frames = [];
     for (int i = 0; i < periods; i++) {
       _periodCount %= _periodsForScale;
-      frames += sineWave(periods: 1, sampleRate: sampleRate, freq: scale[noteIdx]);
+      frames += sineWave(periods: 1, sampleRate: sampleRate, freq: scale[noteIdx], volume: volume);
       _periodCount++;
     }
     return frames;

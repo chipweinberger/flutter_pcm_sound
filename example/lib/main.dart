@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_pcm_sound/flutter_pcm_sound.dart';
 
@@ -30,16 +32,21 @@ class _PcmSoundAppState extends State<PcmSoundApp> {
     super.initState();
     FlutterPcmSound.setLogLevel(LogLevel.verbose);
     FlutterPcmSound.setup(sampleRate: sampleRate, channelCount: 1);
-    FlutterPcmSound.setFeedThreshold(sampleRate ~/ 20);
-    FlutterPcmSound.setFeedCallback(onFeed);
+    if (Platform.isAndroid) {
+      FlutterPcmSound.setFeedThreshold(sampleRate ~/ 15);
+    } else {
+      FlutterPcmSound.setFeedThreshold(sampleRate ~/ 30);
+    }
+    FlutterPcmSound.setFeedCallback(_onFeed);
   }
 
   @override
   void dispose() {
     super.dispose();
+    FlutterPcmSound.release();
   }
 
-  void onFeed(int remainingFrames) async {
+  void _onFeed(int remainingFrames) async {
     setState(() {
       _remainingFrames = remainingFrames;
     });
@@ -63,13 +70,17 @@ class _PcmSoundAppState extends State<PcmSoundApp> {
             children: [
               ElevatedButton(
                 onPressed: () {
-                  FlutterPcmSound.play();
+                  FlutterPcmSound.setFeedCallback(_onFeed);
+                  _onFeed(0); // start feeding
                 },
                 child: Text('Play'),
               ),
               ElevatedButton(
                 onPressed: () {
-                  FlutterPcmSound.stop(clear: false);
+                  FlutterPcmSound.setFeedCallback(null); // stop
+                  setState(() {
+                    _remainingFrames = 0;
+                  });
                 },
                 child: Text('Stop'),
               ),
