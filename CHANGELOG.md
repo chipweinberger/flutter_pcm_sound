@@ -1,3 +1,6 @@
+## 3.0.1
+* **[API]** iOS: clear input samples to prevent annoying noises when debugging
+
 ## 3.0.0
 * **[API]** simplify api: remove `start`
 * **[API]** simplify api: remove `stop`
