@@ -29,17 +29,6 @@ To play audio, just keep calling `feed`.
 
 To stop audio, just stop calling `feed`.
 
-## Ignore feed threshold
-
-To ignore the feed threshold, you can use `setFeedThreshold(-1)`.
-
-1. we will invoke your feed callback 30-100 times per second 
-2. you can choose to feed based on the `remainingFrames` callback argument
-
-iOS invokes the callback at a stable ~100htz.
-
-Android is around ~60htz.
-
 ## Usage
 
 ```dart

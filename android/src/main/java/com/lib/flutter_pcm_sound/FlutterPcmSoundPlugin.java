@@ -266,7 +266,7 @@ public class FlutterPcmSoundPlugin implements
             mAudioTrack.write(data, data.remaining(), AudioTrack.WRITE_BLOCKING);
 
             // invoke feed callback?
-            if (mFeedThreshold == -1 || (mRemainingFrames() <= mFeedThreshold && !mDidInvokeFeedCallback)) {
+            if (mRemainingFrames() <= mFeedThreshold && !mDidInvokeFeedCallback) {
                 mDidInvokeFeedCallback = true;
                 mainThreadHandler.post(this::invokeFeedCallback);
             }

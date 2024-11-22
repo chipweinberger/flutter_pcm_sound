@@ -308,11 +308,7 @@ static OSStatus RenderCallback(void *inRefCon,
         remainingFrames = [instance.mSamples length] / (instance.mNumChannels * sizeof(short));
 
         // should request more frames?
-        if (instance.mFeedThreshold == -1) {
-            shouldRequestMore = true;
-        } else {
-            shouldRequestMore = remainingFrames <= instance.mFeedThreshold && !instance.mDidInvokeFeedCallback;
-        }
+        shouldRequestMore = remainingFrames <= instance.mFeedThreshold && !instance.mDidInvokeFeedCallback;
     }
 
     // stop running, if needed
