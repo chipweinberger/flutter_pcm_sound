@@ -293,6 +293,9 @@ static OSStatus RenderCallback(void *inRefCon,
 
     @synchronized (instance.mSamples) {
 
+        // clear
+        memset(ioData->mBuffers[0].mData, 0, ioData->mBuffers[0].mDataByteSize);
+
         NSUInteger bytesToCopy = MIN(ioData->mBuffers[0].mDataByteSize, [instance.mSamples length]);
         
         // provide samples
