@@ -63,6 +63,13 @@ class FlutterPcmSound {
     _channel.setMethodCallHandler(_methodCallHandler);
   }
 
+  /// convenience function: 
+  ///   * invokes your feed callback
+  static void start() async {
+    assert(onFeedSamplesCallback != null);
+    onFeedSamplesCallback!(0);
+  }
+
   /// release all audio resources
   static Future<void> release() async {
     return await _invokeMethod('release');
