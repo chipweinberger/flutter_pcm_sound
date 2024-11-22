@@ -30,7 +30,7 @@ class _PcmSoundAppState extends State<PcmSoundApp> {
   @override
   void initState() {
     super.initState();
-    FlutterPcmSound.setLogLevel(LogLevel.none);
+    FlutterPcmSound.setLogLevel(LogLevel.verbose);
     FlutterPcmSound.setup(sampleRate: sampleRate, channelCount: 1);
     if (Platform.isAndroid) {
       FlutterPcmSound.setFeedThreshold(-1);
@@ -40,8 +40,6 @@ class _PcmSoundAppState extends State<PcmSoundApp> {
     FlutterPcmSound.setFeedCallback(_onFeed);
   }
 
-  int count = 0;
-
   @override
   void dispose() {
     super.dispose();
@@ -49,13 +47,13 @@ class _PcmSoundAppState extends State<PcmSoundApp> {
   }
 
   void _onFeed(int remainingFrames) async {
-    count++;
-    print(count);
     setState(() {
       _remainingFrames = remainingFrames;
     });
-    List<int> frames = scale.generate(periods: 20);
-    await FlutterPcmSound.feed(PcmArrayInt16.fromList(frames));
+    if (remainingFrames < 6000) {
+      List<int> frames = scale.generate(periods: 10);
+      await FlutterPcmSound.feed(PcmArrayInt16.fromList(frames));
+    }
   }
 
   Widget build(BuildContext context) {

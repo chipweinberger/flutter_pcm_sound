@@ -180,14 +180,14 @@ class MajorScale {
   }
 
   // generate a sine wave
-  List<int> sineWave({int periods = 1, int sampleRate = 44100, double freq = 440, double volume = 0.5}) {
+  List<int> cosineWave({int periods = 1, int sampleRate = 44100, double freq = 440, double volume = 0.5}) {
     final period = 1.0 / freq;
     final nFramesPerPeriod = (period * sampleRate).toInt();
     final totalFrames = nFramesPerPeriod * periods;
     final step = math.pi * 2 / nFramesPerPeriod;
     List<int> data = List.filled(totalFrames, 0);
     for (int i = 0; i < totalFrames; i++) {
-      data[i] = (math.sin(step * (i % nFramesPerPeriod)) * volume * 32767).toInt();
+      data[i] = (math.cos(step * (i % nFramesPerPeriod)) * volume * 32768).toInt() - 16384;
     }
     return data;
   }
@@ -197,11 +197,11 @@ class MajorScale {
   }
 
   // generate the next X periods of the major scale
-  List<int> generate({required int periods, double volume = 1.0}) {
+  List<int> generate({required int periods, double volume = 0.5}) {
     List<int> frames = [];
     for (int i = 0; i < periods; i++) {
       _periodCount %= _periodsForScale;
-      frames += sineWave(periods: 1, sampleRate: sampleRate, freq: scale[noteIdx], volume: volume);
+      frames += cosineWave(periods: 1, sampleRate: sampleRate, freq: scale[noteIdx], volume: volume);
       _periodCount++;
     }
     return frames;
