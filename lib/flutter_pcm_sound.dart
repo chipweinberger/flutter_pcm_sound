@@ -34,7 +34,9 @@ class FlutterPcmSound {
   /// 'avAudioCategory' is for iOS only,
   /// enabled by default on other platforms
   static Future<void> setup(
-      {required int sampleRate, required int channelCount, IosAudioCategory iosAudioCategory = IosAudioCategory.playback}) async {
+      {required int sampleRate,
+      required int channelCount,
+      IosAudioCategory iosAudioCategory = IosAudioCategory.playback}) async {
     return await _invokeMethod('setup', {
       'sample_rate': sampleRate,
       'num_channels': channelCount,
@@ -47,14 +49,10 @@ class FlutterPcmSound {
     return await _invokeMethod('play');
   }
 
-  /// suspend playback, but does *not* clear queued samples
-  static Future<void> pause() async {
-    return await _invokeMethod('pause');
-  }
-
-  /// suspend playback & clear queued samples
-  static Future<void> stop() async {
-    return await _invokeMethod('stop');
+  /// stop playback
+  /// /// - `play`: also clear queued samples
+  static Future<void> stop({bool clear = false}) async {
+    return await _invokeMethod('stop', {'clear': clear});
   }
 
   /// clear queued samples
@@ -63,8 +61,9 @@ class FlutterPcmSound {
   }
 
   /// queue 16-bit samples (little endian)
-  static Future<void> feed(PcmArrayInt16 buffer) async {
-    return await _invokeMethod('feed', {'buffer': buffer.bytes.buffer.asUint8List()});
+  /// - `play`: also start playing
+  static Future<void> feed(PcmArrayInt16 buffer, {bool play = false}) async {
+    return await _invokeMethod('feed', {'buffer': buffer.bytes.buffer.asUint8List(), 'play': play});
   }
 
   /// set the threshold at which we call the

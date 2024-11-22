@@ -23,7 +23,6 @@ class PcmSoundApp extends StatefulWidget {
 
 class _PcmSoundAppState extends State<PcmSoundApp> {
   int _remainingFrames = 0;
-  bool stopFeeding = false;
   MajorScale scale = MajorScale(sampleRate: sampleRate, noteDuration: 0.20);
 
   @override
@@ -44,10 +43,8 @@ class _PcmSoundAppState extends State<PcmSoundApp> {
     setState(() {
       _remainingFrames = remainingFrames;
     });
-    if (stopFeeding == false) {
-      List<int> frames = scale.generate(periods: 20);
-      await FlutterPcmSound.feed(PcmArrayInt16.fromList(frames));
-    }
+    List<int> frames = scale.generate(periods: 20);
+    await FlutterPcmSound.feed(PcmArrayInt16.fromList(frames));
   }
 
   Widget build(BuildContext context) {
@@ -67,42 +64,16 @@ class _PcmSoundAppState extends State<PcmSoundApp> {
               ElevatedButton(
                 onPressed: () {
                   FlutterPcmSound.play();
-                  stopFeeding = false;
                 },
                 child: Text('Play'),
               ),
               ElevatedButton(
                 onPressed: () {
-                  FlutterPcmSound.pause();
-                },
-                child: Text('Pause'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  stopFeeding = true;
-                },
-                child: Text('Stop Feeding'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  FlutterPcmSound.stop();
-                  setState(() {
-                    scale.reset();
-                    _remainingFrames = 0;
-                  });
+                  FlutterPcmSound.stop(clear: false);
                 },
                 child: Text('Stop'),
               ),
-              ElevatedButton(
-                onPressed: () {
-                  FlutterPcmSound.clear();
-                  setState(() {
-                    _remainingFrames = 0;
-                  });
-                },
-                child: Text('Clear'),
-              ),
-              Text('$_remainingFrames Remaining Samples')
+              Text('$_remainingFrames Remaining Frames')
             ],
           ),
         ),

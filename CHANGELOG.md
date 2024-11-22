@@ -1,3 +1,6 @@
+## 2.0.0
+* **[API]** simplify api: combine `pause` & `stop` into single function
+
 ## 1.2.7
 * **[Fix]** Example: accidentally pushed changes
 

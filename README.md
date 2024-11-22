@@ -57,14 +57,11 @@ await FlutterPcmSound.play();
 ## Other Functions
 
 ```dart
-// suspend playback but does *not* clear queued samples
-await FlutterPcmSound.pause();
-
 // clears all queued samples
 await FlutterPcmSound.clear();
 
 // suspend playback & clear queued samples
-await FlutterPcmSound.stop();
+await FlutterPcmSound.stop(clear: true);
 
 // get the current number of queued frames
 int samples = await FlutterPcmSound.remainingFrames();

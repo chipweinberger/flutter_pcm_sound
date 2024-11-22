@@ -74,7 +74,6 @@ public class FlutterPcmSoundPlugin implements
         // ensure setup
         switch (call.method) {
             case "play":
-            case "pause":
             case "stop":
             case "clear":
             case "feed": {
@@ -144,25 +143,20 @@ public class FlutterPcmSoundPlugin implements
                     invokeFeedCallback();
                     mAudioTrack.play();
                     resumePlaybackThread();
+                    mIsPlaying = true;
                 }
-                mIsPlaying = true;
-                result.success(true);
-                break;
-            case "pause":
-                if (mIsPlaying == true) {
-                    mAudioTrack.pause();
-                    suspendPlaybackThread();
-                }
-                mIsPlaying = false;
                 result.success(true);
                 break;
             case "stop":
+                boolean clear = (boolean) call.argument("clear");
                 if (mIsPlaying == true) {
                     mAudioTrack.pause();
                     suspendPlaybackThread();
                 }
                 mIsPlaying = false;
-                mSamplesClear();
+                if (clear) {
+                    mSamplesClear();
+                }
                 result.success(true);
                 break;
             case "clear":
@@ -171,6 +165,7 @@ public class FlutterPcmSoundPlugin implements
                 break;
             case "feed":
                 byte[] buffer = call.argument("buffer");
+                boolean play = (boolean) call.argument("play");
 
                 // Split into smaller buffers
                 List<ByteBuffer> got = split(buffer, MAX_FRAMES_PER_BUFFER);
@@ -180,6 +175,13 @@ public class FlutterPcmSoundPlugin implements
 
                 // reset
                 mDidInvokeFeedCallback = false;
+
+                // also start playing
+                if (play && mIsPlaying == false) {
+                    mAudioTrack.play();
+                    resumePlaybackThread();
+                    mIsPlaying = true;
+                }
 
                 result.success(true);
                 break;
