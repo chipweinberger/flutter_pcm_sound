@@ -1,3 +1,6 @@
+## 3.1.0
+* **[API]** remove -1 feed threshold support
+
 ## 3.0.1
 * **[API]** iOS: clear input samples to prevent annoying noises when debugging
 
