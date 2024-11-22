@@ -1,3 +1,9 @@
+## 3.0.0
+* **[API]** simplify api: remove `start`
+* **[API]** simplify api: remove `stop`
+* **[API]** simplify api: to start & stop, just feed & stop feeding.
+* **[API]** simplify api: remove `remainingSamples`. uneeded.
+
 ## 2.0.0
 * **[API]** simplify api: combine `pause` & `stop` into single function
 

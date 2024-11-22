@@ -30,15 +30,17 @@ class _PcmSoundAppState extends State<PcmSoundApp> {
   @override
   void initState() {
     super.initState();
-    FlutterPcmSound.setLogLevel(LogLevel.verbose);
+    FlutterPcmSound.setLogLevel(LogLevel.none);
     FlutterPcmSound.setup(sampleRate: sampleRate, channelCount: 1);
     if (Platform.isAndroid) {
-      FlutterPcmSound.setFeedThreshold(sampleRate ~/ 15);
+      FlutterPcmSound.setFeedThreshold(-1);
     } else {
       FlutterPcmSound.setFeedThreshold(sampleRate ~/ 30);
     }
     FlutterPcmSound.setFeedCallback(_onFeed);
   }
+
+  int count = 0;
 
   @override
   void dispose() {
@@ -47,6 +49,8 @@ class _PcmSoundAppState extends State<PcmSoundApp> {
   }
 
   void _onFeed(int remainingFrames) async {
+    count++;
+    print(count);
     setState(() {
       _remainingFrames = remainingFrames;
     });

@@ -16,23 +16,29 @@ Unlike other plugins, `flutter_pcm_sound` does *not* use audio files (For exampl
 
 Instead, `flutter_pcm_sound` is for apps that generate audio in realtime a few milliseconds before you hear it. For example, using [dart_melty_soundfont](https://pub.dev/packages/dart_melty_soundfont).
 
+
 ## Callback Based, For Real-Time Audio
 
 In contrast to [raw_sound](https://pub.dev/packages/raw_sound), FlutterPcmSound uses a callback `setFeedCallback` to signal when to feed more samples.
 
 You can lower the feed threshold using `setFeedThreshold` to achieve real time audio, or increase it to have a cushy buffer.
 
-You can also manually `feed` whenever you like.
+## One-Pedal Driving
 
-## ignore feed threshold
+To play audio, just keep calling `feed`. 
 
-To monitor remaining samples in real-time, you can use `setFeedThreshold(-1)`.
+To stop audio, just stop calling `feed`.
 
-We will invoke your callback 30-100 times per second regardless of how many samples remain.
+## Ignore feed threshold
 
-iOS is a stable ~100htz.
+To ignore the feed threshold, you can use `setFeedThreshold(-1)`.
 
-Android is less predictable. Figure around ~30-60htz.
+1. we will invoke your feed callback 30-100 times per second 
+2. you can choose to feed based on the `remainingFrames` callback argument
+
+iOS invokes the callback at a stable ~100htz.
+
+Android is around ~60htz.
 
 ## Usage
 
@@ -44,27 +50,14 @@ MajorScale scale = MajorScale(sampleRate: 44100, noteDuration: 0.25);
 void onFeed(int remainingFrames) async {
     // you could use 'remainingFrames' to feed very precisely.
     // But here we just load a few thousand samples everytime we run low.
-    List<int> frame = scale.generate(periods: 100);
+    List<int> frame = scale.generate(periods: 20);
     await FlutterPcmSound.feed(PcmArrayInt16.fromList(frame));
 }
 
 await FlutterPcmSound.setup(sampleRate: 44100, channelCount: 1);
-await FlutterPcmSound.setFeedThreshold(8000); // feed when below 8000 queued frames
+await FlutterPcmSound.setFeedThreshold(8000); 
 await FlutterPcmSound.setFeedCallback(onFeed);
-await FlutterPcmSound.play();
-```
-
-## Other Functions
-
-```dart
-// clears all queued samples
-await FlutterPcmSound.clear();
-
-// suspend playback & clear queued samples
-await FlutterPcmSound.stop(clear: true);
-
-// get the current number of queued frames
-int samples = await FlutterPcmSound.remainingFrames();
+await FlutterPcmSound.feed(PcmArrayInt16.fromList(scale.generate(periods: 20))); // start playback
 ```
 
 ## ⭐ Stars ⭐
