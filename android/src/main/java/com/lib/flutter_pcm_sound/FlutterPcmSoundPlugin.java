@@ -45,6 +45,7 @@ public class FlutterPcmSoundPlugin implements
     private AudioTrack mAudioTrack;
     private int mNumChannels;
     private int mMinBufferSize;
+    private boolean mDidSetup = false;
 
     private long mFeedThreshold = 8000;
     private volatile boolean mDidInvokeFeedCallback = false;
@@ -153,14 +154,23 @@ public class FlutterPcmSoundPlugin implements
                     playbackThread.setPriority(Thread.MAX_PRIORITY);
                     playbackThread.start();
 
+                    mDidSetup = true;
+
                     result.success(true);
                     break;
                 }
                 case "feed": {
+
+                    // check setup (to match iOS behavior)
+                    if (mDidSetup == false) {
+                        result.error("Setup", "must call setup first", null);
+                        return;
+                    }
+
                     byte[] buffer = call.argument("buffer");
 
                     if (buffer == null || buffer.length == 0) {
-                        result.error("InvalidArguments", "buffer is required and cannot be empty.", null);
+                        result.error("InvalidArguments", "buffer is required and cannot be empty", null);
                         return;
                     }
 
@@ -219,6 +229,7 @@ public class FlutterPcmSoundPlugin implements
                 Thread.currentThread().interrupt();
             }
             playbackThread = null;
+            mDidSetup = false;
         }
     }
 

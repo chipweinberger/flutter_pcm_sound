@@ -24,6 +24,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 @property(nonatomic) int mNumChannels; 
 @property(nonatomic) int mFeedThreshold; 
 @property(nonatomic) bool mDidInvokeFeedCallback; 
+@property(nonatomic) bool mDidSetup; 
 @end
 
 @implementation FlutterPcmSoundPlugin
@@ -39,6 +40,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
     instance.mSamples = [NSMutableData new];
     instance.mFeedThreshold = 8000;
     instance.mDidInvokeFeedCallback = false;
+    instance.mDidSetup = false;
 
     [registrar addMethodCallDelegate:instance channel:methodChannel];
 }
@@ -173,11 +175,19 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
                 result([FlutterError errorWithCode:@"AudioUnitError" message:message details:nil]);
                 return;
             }
+
+            self.mDidSetup = true;
             
             result(@(true));
         }
         else if ([@"feed" isEqualToString:call.method])
         {
+            // setup check
+            if (self.mDidSetup == false) {
+                result([FlutterError errorWithCode:@"Setup" message:@"must call setup first" details:nil]);
+                return;
+            }
+
             NSDictionary *args = (NSDictionary*)call.arguments;
             FlutterStandardTypedData *buffer = args[@"buffer"];
 
@@ -188,29 +198,12 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
             // reset
             self.mDidInvokeFeedCallback = false;
 
-            // start playback if we can
-            if (_mAudioUnit != nil) {
-                UInt32 isPlaying = 0;
-                UInt32 size = sizeof(isPlaying);
-                OSStatus status = AudioUnitGetProperty(_mAudioUnit,
-                                                    kAudioOutputUnitProperty_IsRunning,
-                                                    kAudioUnitScope_Global,
-                                                    0,
-                                                    &isPlaying,
-                                                    &size);
-                if (status != noErr) {
-                    NSString* message = [NSString stringWithFormat:@"AudioUnitGetProperty IsRunning failed. OSStatus: %@", @(status)];
-                    result([FlutterError errorWithCode:@"AudioUnitError" message:message details:nil]);
-                    return;
-                }
-                if (!isPlaying) {
-                    status = AudioOutputUnitStart(_mAudioUnit);
-                    if (status != noErr) {
-                        NSString* message = [NSString stringWithFormat:@"AudioOutputUnitStart failed. OSStatus: %@", @(status)];
-                        result([FlutterError errorWithCode:@"AudioUnitError" message:message details:nil]);
-                        return;
-                    }
-                }
+            // start
+            OSStatus status = AudioOutputUnitStart(_mAudioUnit);
+            if (status != noErr) {
+                NSString* message = [NSString stringWithFormat:@"AudioOutputUnitStart failed. OSStatus: %@", @(status)];
+                result([FlutterError errorWithCode:@"AudioUnitError" message:message details:nil]);
+                return;
             }
 
             result(@(true));
@@ -248,6 +241,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
         AudioUnitUninitialize(_mAudioUnit);
         AudioComponentInstanceDispose(_mAudioUnit);
         _mAudioUnit = nil;
+        self.mDidSetup = false;
     }
     @synchronized (self.mSamples) {
         self.mSamples = [NSMutableData new]; 

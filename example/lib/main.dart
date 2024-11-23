@@ -1,9 +1,6 @@
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_pcm_sound/flutter_pcm_sound.dart';
-
-const int sampleRate = 44100;
 
 void main() {
   runApp(MyApp());
@@ -24,6 +21,9 @@ class PcmSoundApp extends StatefulWidget {
 }
 
 class _PcmSoundAppState extends State<PcmSoundApp> {
+
+  static const int sampleRate = 48000;
+
   int _remainingFrames = 0;
   MajorScale scale = MajorScale(sampleRate: sampleRate, noteDuration: 0.20);
 
@@ -32,11 +32,7 @@ class _PcmSoundAppState extends State<PcmSoundApp> {
     super.initState();
     FlutterPcmSound.setLogLevel(LogLevel.verbose);
     FlutterPcmSound.setup(sampleRate: sampleRate, channelCount: 1);
-    if (Platform.isAndroid) {
-      FlutterPcmSound.setFeedThreshold(-1);
-    } else {
-      FlutterPcmSound.setFeedThreshold(sampleRate ~/ 30);
-    }
+    FlutterPcmSound.setFeedThreshold(sampleRate ~/ 10);
     FlutterPcmSound.setFeedCallback(_onFeed);
   }
 
@@ -50,10 +46,8 @@ class _PcmSoundAppState extends State<PcmSoundApp> {
     setState(() {
       _remainingFrames = remainingFrames;
     });
-    if (remainingFrames < 6000) {
-      List<int> frames = scale.generate(periods: 10);
-      await FlutterPcmSound.feed(PcmArrayInt16.fromList(frames));
-    }
+    List<int> frames = scale.generate(periods: 20);
+    await FlutterPcmSound.feed(PcmArrayInt16.fromList(frames));
   }
 
   Widget build(BuildContext context) {

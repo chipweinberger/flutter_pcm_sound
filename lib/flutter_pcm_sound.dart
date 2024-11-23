@@ -63,9 +63,9 @@ class FlutterPcmSound {
     _channel.setMethodCallHandler(_methodCallHandler);
   }
 
-  /// convenience function: 
+  /// convenience function:
   ///   * invokes your feed callback
-  static void start() async {
+  static void start() {
     assert(onFeedSamplesCallback != null);
     onFeedSamplesCallback!(0);
   }
