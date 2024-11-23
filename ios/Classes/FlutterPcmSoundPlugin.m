@@ -188,26 +188,28 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
             // reset
             self.mDidInvokeFeedCallback = false;
 
-            // start playing, if needed
-            UInt32 isPlaying = 0;
-            UInt32 size = sizeof(isPlaying);
-            OSStatus status = AudioUnitGetProperty(_mAudioUnit,
-                                                kAudioOutputUnitProperty_IsRunning,
-                                                kAudioUnitScope_Global,
-                                                0,
-                                                &isPlaying,
-                                                &size);
-            if (status != noErr) {
-                NSString* message = [NSString stringWithFormat:@"AudioUnitGetProperty IsRunning failed. OSStatus: %@", @(status)];
-                result([FlutterError errorWithCode:@"AudioUnitError" message:message details:nil]);
-                return;
-            }
-            if (!isPlaying) {
-                status = AudioOutputUnitStart(_mAudioUnit);
+            // start playback if we can
+            if (_mAudioUnit != nil) {
+                UInt32 isPlaying = 0;
+                UInt32 size = sizeof(isPlaying);
+                OSStatus status = AudioUnitGetProperty(_mAudioUnit,
+                                                    kAudioOutputUnitProperty_IsRunning,
+                                                    kAudioUnitScope_Global,
+                                                    0,
+                                                    &isPlaying,
+                                                    &size);
                 if (status != noErr) {
-                    NSString* message = [NSString stringWithFormat:@"AudioOutputUnitStart failed. OSStatus: %@", @(status)];
+                    NSString* message = [NSString stringWithFormat:@"AudioUnitGetProperty IsRunning failed. OSStatus: %@", @(status)];
                     result([FlutterError errorWithCode:@"AudioUnitError" message:message details:nil]);
                     return;
+                }
+                if (!isPlaying) {
+                    status = AudioOutputUnitStart(_mAudioUnit);
+                    if (status != noErr) {
+                        NSString* message = [NSString stringWithFormat:@"AudioOutputUnitStart failed. OSStatus: %@", @(status)];
+                        result([FlutterError errorWithCode:@"AudioUnitError" message:message details:nil]);
+                        return;
+                    }
                 }
             }
 
