@@ -1,3 +1,6 @@
+## 3.1.2
+* **[Improve]** add `setup` check before feed
+
 ## 3.1.1
 * **[Improve]** Android: feed 200 samples at a time, to align with common feed rates
 * **[Improve]** iOS: don't try to play until setup is called
