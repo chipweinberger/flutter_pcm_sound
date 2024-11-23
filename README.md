@@ -44,8 +44,8 @@ void onFeed(int remainingFrames) async {
 }
 
 await FlutterPcmSound.setup(sampleRate: 44100, channelCount: 1);
-await FlutterPcmSound.setFeedThreshold(8000); 
-await FlutterPcmSound.setFeedCallback(onFeed);
+FlutterPcmSound.setFeedThreshold(8000); 
+FlutterPcmSound.setFeedCallback(onFeed);
 FlutterPcmSound.start(); // just invokes your feed callback
 ```
 
