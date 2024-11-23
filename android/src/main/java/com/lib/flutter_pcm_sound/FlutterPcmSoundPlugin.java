@@ -35,7 +35,7 @@ public class FlutterPcmSoundPlugin implements
     MethodChannel.MethodCallHandler
 {
     private static final String CHANNEL_NAME = "flutter_pcm_sound/methods";
-    private static final int MAX_FRAMES_PER_BUFFER = 250;
+    private static final int MAX_FRAMES_PER_BUFFER = 200;
 
     private MethodChannel mMethodChannel;
     private Handler mainThreadHandler = new Handler(Looper.getMainLooper());
