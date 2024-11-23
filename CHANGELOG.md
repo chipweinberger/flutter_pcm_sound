@@ -1,3 +1,7 @@
+## 3.1.1
+* **[Improve]** Android: feed 200 samples at a time, to align with common feed rates
+* **[Improve]** iOS: don't try to play until setup is called
+
 ## 3.1.0
 * **[API]** remove -1 feed threshold support
 
