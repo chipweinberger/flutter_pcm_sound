@@ -81,17 +81,6 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
                 category = AVAudioSessionCategoryPlayback;
             } else if ([iosAudioCategory isEqualToString:@"playAndRecord"]) {
                 category = AVAudioSessionCategoryPlayAndRecord;
-                
-                // Otherwise, will default to using earpiece for audio output.
-                NSError* errorForSpeaker;
-                BOOL success = [[AVAudioSession sharedInstance] overrideOutputAudioPort:AVAudioSessionPortOverrideSpeaker error:&errorForSpeaker];
-                if (!success) {
-                    NSLog(@"Error setting audio output to speaker: %@", errorForSpeaker);
-                    result([FlutterError errorWithCode:@"AVAudioSessionError" 
-                                            message:@"Error setting audio output to speaker" 
-                                            details:[errorForSpeaker localizedDescription]]);
-                    return;
-                }
             }
             
             // Set the AVAudioSession category based on the string value
@@ -103,6 +92,20 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
                                         message:@"Error setting AVAudioSession category" 
                                         details:[error localizedDescription]]);
                 return;
+            }
+
+            if (category == AVAudioSessionCategoryPlayAndRecord) {
+                // Otherwise, will default to using earpiece for audio output.
+                NSError* errorForSpeaker;
+                BOOL success = [[AVAudioSession sharedInstance] overrideOutputAudioPort:AVAudioSessionPortOverrideSpeaker error:&errorForSpeaker];
+                if (!success) {
+                    NSLog(@"Error setting audio output to speaker: %@", errorForSpeaker);
+                    result([FlutterError errorWithCode:@"AVAudioSessionError" 
+                                            message:@"Error setting audio output to speaker" 
+                                            details:[errorForSpeaker localizedDescription]]);
+                    return;
+                }
+                NSLog(@"Audio output set to speaker");
             }
             
             // Activate the audio session
