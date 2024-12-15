@@ -81,6 +81,17 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
                 category = AVAudioSessionCategoryPlayback;
             } else if ([iosAudioCategory isEqualToString:@"playAndRecord"]) {
                 category = AVAudioSessionCategoryPlayAndRecord;
+                
+                // Otherwise, will default to using earpiece for audio output.
+                NSError* errorForSpeaker;
+                BOOL success = [session overrideOutputAudioPort:AVAudioSessionPortOverrideSpeaker error:&errorForSpeaker];
+                if (!success) {
+                    NSLog(@"Error setting audio output to speaker: %@", errorForSpeaker);
+                    result([FlutterError errorWithCode:@"AVAudioSessionError" 
+                                            message:@"Error setting audio output to speaker" 
+                                            details:[errorForSpeaker localizedDescription]]);
+                    return;
+                }
             }
             
             // Set the AVAudioSession category based on the string value
