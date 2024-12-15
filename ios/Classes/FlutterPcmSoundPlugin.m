@@ -254,6 +254,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 - (void)cleanup
 {
     if (_mAudioUnit != nil) {
+        [self stopAudioUnit];
         AudioUnitUninitialize(_mAudioUnit);
         AudioComponentInstanceDispose(_mAudioUnit);
         _mAudioUnit = nil;
