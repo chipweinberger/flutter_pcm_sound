@@ -84,7 +84,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
                 
                 // Otherwise, will default to using earpiece for audio output.
                 NSError* errorForSpeaker;
-                BOOL success = [session overrideOutputAudioPort:AVAudioSessionPortOverrideSpeaker error:&errorForSpeaker];
+                BOOL success = [[AVAudioSession sharedInstance] overrideOutputAudioPort:AVAudioSessionPortOverrideSpeaker error:&errorForSpeaker];
                 if (!success) {
                     NSLog(@"Error setting audio output to speaker: %@", errorForSpeaker);
                     result([FlutterError errorWithCode:@"AVAudioSessionError" 
