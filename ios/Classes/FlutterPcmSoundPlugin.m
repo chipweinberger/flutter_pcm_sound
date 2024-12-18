@@ -1,7 +1,9 @@
 #import "FlutterPcmSoundPlugin.h"
 #import <AudioToolbox/AudioToolbox.h>
 
+#if TARGET_OS_IOS
 #import <AVFoundation/AVFoundation.h>
+#endif
 
 #define kOutputBus 0
 #define NAMESPACE @"flutter_pcm_sound"
@@ -27,9 +29,6 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 // We’ll track the chosen audio category to know if we should override the speaker
 @property(nonatomic, copy) NSString *chosenCategory;
 
-// Keep a reference to the audio session for convenience
-@property(nonatomic, strong) AVAudioSession *audioSession;
-
 @end
 
 @implementation FlutterPcmSoundPlugin
@@ -46,7 +45,6 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
     instance.mFeedThreshold = 8000;
     instance.mDidInvokeFeedCallback = false;
     instance.mDidSetup = false;
-    instance.audioSession = [AVAudioSession sharedInstance];
 
     [registrar addMethodCallDelegate:instance channel:methodChannel];
 }
@@ -92,7 +90,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
             
             // Set the AVAudioSession category based on the string value
             NSError *error = nil;
-            [self.audioSession setCategory:category error:&error];
+            [[AVAudioSession sharedInstance] setCategory:category error:&error];
             if (error) {
                 NSLog(@"Error setting AVAudioSession category: %@", error);
                 result([FlutterError errorWithCode:@"AVAudioSessionError"
@@ -101,7 +99,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
                 return;
             }
 
-            [self.audioSession setActive:YES error:&error];
+            [[AVAudioSession sharedInstance] setActive:YES error:&error];
             if (error) {
                 NSLog(@"Error activating AVAudioSession: %@", error);
                 result([FlutterError errorWithCode:@"AVAudioSessionError"
@@ -305,7 +303,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 }
 
 - (void)ensureNotEarpiece {
-    AVAudioSessionRouteDescription *currentRoute = self.audioSession.currentRoute;
+    AVAudioSessionRouteDescription *currentRoute = [AVAudioSession sharedInstance].currentRoute;
     BOOL isEarpiece = NO;
     for (AVAudioSessionPortDescription *output in currentRoute.outputs) {
         // Built-in receiver is the "earpiece"
@@ -317,7 +315,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 
     if (isEarpiece) {
         NSError *error = nil;
-        [self.audioSession overrideOutputAudioPort:AVAudioSessionPortOverrideSpeaker error:&error];
+        [[AVAudioSession sharedInstance] overrideOutputAudioPort:AVAudioSessionPortOverrideSpeaker error:&error];
         if (error) {
             NSLog(@"Error overriding to speaker: %@", error);
         } else {
