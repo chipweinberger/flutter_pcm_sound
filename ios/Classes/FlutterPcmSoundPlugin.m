@@ -6,7 +6,7 @@
 #endif
 
 #define kOutputBus 0
-#define NAMESPACE @"flutter_pcm_sound" // Assuming this is the namespace you want
+#define NAMESPACE @"flutter_pcm_sound"
 
 typedef NS_ENUM(NSUInteger, LogLevel) {
     none = 0,
@@ -112,20 +112,12 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
                 return;
             }
 
-            // If using playAndRecord, we want to start from the speaker rather than the earpiece
+            // If using playAndRecord, ensure we don't use the earpiece:
+            // Check current route. If built-in receiver is present, override to speaker.
             if ([iosAudioCategory isEqualToString:@"playAndRecord"]) {
-                // Force speaker output initially
-                NSError *errorForSpeaker;
-                BOOL success = [self.audioSession overrideOutputAudioPort:AVAudioSessionPortOverrideSpeaker
-                                                                    error:&errorForSpeaker];
-                if (!success) {
-                    NSLog(@"Error setting audio output to speaker: %@", errorForSpeaker);
-                    result([FlutterError errorWithCode:@"AVAudioSessionError"
-                                               message:@"Error setting audio output to speaker"
-                                               details:[errorForSpeaker localizedDescription]]);
-                    return;
-                }
-                // Add observer to monitor route changes
+                [self ensureNotEarpiece];
+                
+                // Add observer to handle future route changes
                 [[NSNotificationCenter defaultCenter] addObserver:self
                                                          selector:@selector(handleRouteChange:)
                                                              name:AVAudioSessionRouteChangeNotification
@@ -311,34 +303,33 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 
 #if TARGET_OS_IOS
 - (void)handleRouteChange:(NSNotification *)notification {
+    [self ensureNotEarpiece];
+}
+
+- (void)ensureNotEarpiece {
     AVAudioSessionRouteDescription *currentRoute = self.audioSession.currentRoute;
-    BOOL headphonesConnected = NO;
+    BOOL isEarpiece = NO;
     for (AVAudioSessionPortDescription *output in currentRoute.outputs) {
-        if ([output.portType isEqualToString:AVAudioSessionPortHeadphones]) {
-            headphonesConnected = YES;
+        // Built-in receiver is the "earpiece"
+        if ([output.portType isEqualToString:AVAudioSessionPortBuiltInReceiver]) {
+            isEarpiece = YES;
             break;
         }
     }
 
-    NSError *error = nil;
-    if ([self.chosenCategory isEqualToString:@"playAndRecord"]) {
-        // If headphones are connected, remove speaker override so system will route to them
-        if (headphonesConnected) {
-            [self.audioSession overrideOutputAudioPort:AVAudioSessionPortOverrideNone error:&error];
-            if (error) {
-                NSLog(@"Error removing speaker override: %@", error);
-            } else {
-                NSLog(@"Headphones connected, removing speaker override.");
-            }
+    if (isEarpiece) {
+        NSError *error = nil;
+        [self.audioSession overrideOutputAudioPort:AVAudioSessionPortOverrideSpeaker error:&error];
+        if (error) {
+            NSLog(@"Error overriding to speaker: %@", error);
         } else {
-            // No headphones, ensure we are not routing through earpiece
-            [self.audioSession overrideOutputAudioPort:AVAudioSessionPortOverrideSpeaker error:&error];
-            if (error) {
-                NSLog(@"Error setting back to speaker: %@", error);
-            } else {
-                NSLog(@"Headphones disconnected, forcing speaker again.");
-            }
+            NSLog(@"Earpiece was selected, overriding to speaker.");
         }
+    } else {
+        // If not using earpiece, do nothing. Headphones, AirPlay, etc. will remain as is.
+        // Also, if previously overridden, we can revert if desired:
+        // But generally, calling overrideOutputAudioPort(.none) is only needed if we previously forced the speaker.
+        // If we always force speaker only when the earpiece is chosen, we do not need to revert explicitly.
     }
 }
 #endif
