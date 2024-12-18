@@ -1,9 +1,7 @@
 #import "FlutterPcmSoundPlugin.h"
 #import <AudioToolbox/AudioToolbox.h>
 
-#if TARGET_OS_IOS
 #import <AVFoundation/AVFoundation.h>
-#endif
 
 #define kOutputBus 0
 #define NAMESPACE @"flutter_pcm_sound"
