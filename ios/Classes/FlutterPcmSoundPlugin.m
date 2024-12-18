@@ -25,6 +25,13 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 @property(nonatomic) int mFeedThreshold; 
 @property(nonatomic) bool mDidInvokeFeedCallback; 
 @property(nonatomic) bool mDidSetup; 
+
+// We’ll track the chosen audio category to know if we should override the speaker
+@property(nonatomic, copy) NSString *chosenCategory;
+
+// Keep a reference to the audio session for convenience
+@property(nonatomic, strong) AVAudioSession *audioSession;
+
 @end
 
 @implementation FlutterPcmSoundPlugin
@@ -41,6 +48,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
     instance.mFeedThreshold = 8000;
     instance.mDidInvokeFeedCallback = false;
     instance.mDidSetup = false;
+    instance.audioSession = [AVAudioSession sharedInstance];
 
     [registrar addMethodCallDelegate:instance channel:methodChannel];
 }
@@ -65,6 +73,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
             NSNumber *numChannels      = args[@"num_channels"];
 #if TARGET_OS_IOS
             NSString *iosAudioCategory = args[@"ios_audio_category"];
+            self.chosenCategory = iosAudioCategory;
 #endif
 
             self.mNumChannels = [numChannels intValue];
@@ -72,7 +81,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 #if TARGET_OS_IOS
 	        // handle background audio in iOS
             // Default to Playback if no matching case is found
-            AVAudioSessionCategory category = AVAudioSessionCategorySoloAmbient;
+            AVAudioSessionCategory category = AVAudioSessionCategoryPlayback;
             if ([iosAudioCategory isEqualToString:@"ambient"]) {
                 category = AVAudioSessionCategoryAmbient;
             } else if ([iosAudioCategory isEqualToString:@"soloAmbient"]) {
@@ -85,37 +94,42 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
             
             // Set the AVAudioSession category based on the string value
             NSError *error = nil;
-            [[AVAudioSession sharedInstance] setCategory:category error:&error];
+            [self.audioSession setCategory:category error:&error];
             if (error) {
                 NSLog(@"Error setting AVAudioSession category: %@", error);
-                result([FlutterError errorWithCode:@"AVAudioSessionError" 
-                                        message:@"Error setting AVAudioSession category" 
-                                        details:[error localizedDescription]]);
+                result([FlutterError errorWithCode:@"AVAudioSessionError"
+                                           message:@"Error setting AVAudioSession category"
+                                           details:[error localizedDescription]]);
                 return;
             }
 
-            if (category == AVAudioSessionCategoryPlayAndRecord) {
-                // Otherwise, will default to using earpiece for audio output.
-                NSError* errorForSpeaker;
-                BOOL success = [[AVAudioSession sharedInstance] overrideOutputAudioPort:AVAudioSessionPortOverrideSpeaker error:&errorForSpeaker];
-                if (!success) {
-                    NSLog(@"Error setting audio output to speaker: %@", errorForSpeaker);
-                    result([FlutterError errorWithCode:@"AVAudioSessionError" 
-                                            message:@"Error setting audio output to speaker" 
-                                            details:[errorForSpeaker localizedDescription]]);
-                    return;
-                }
-                NSLog(@"Audio output set to speaker");
-            }
-            
-            // Activate the audio session
-            [[AVAudioSession sharedInstance] setActive:YES error:&error];
+            [self.audioSession setActive:YES error:&error];
             if (error) {
                 NSLog(@"Error activating AVAudioSession: %@", error);
-                result([FlutterError errorWithCode:@"AVAudioSessionError" 
-                                        message:@"Error activating AVAudioSession" 
-                                        details:[error localizedDescription]]);
+                result([FlutterError errorWithCode:@"AVAudioSessionError"
+                                           message:@"Error activating AVAudioSession"
+                                           details:[error localizedDescription]]);
                 return;
+            }
+
+            // If using playAndRecord, we want to start from the speaker rather than the earpiece
+            if ([iosAudioCategory isEqualToString:@"playAndRecord"]) {
+                // Force speaker output initially
+                NSError *errorForSpeaker;
+                BOOL success = [self.audioSession overrideOutputAudioPort:AVAudioSessionPortOverrideSpeaker
+                                                                    error:&errorForSpeaker];
+                if (!success) {
+                    NSLog(@"Error setting audio output to speaker: %@", errorForSpeaker);
+                    result([FlutterError errorWithCode:@"AVAudioSessionError"
+                                               message:@"Error setting audio output to speaker"
+                                               details:[errorForSpeaker localizedDescription]]);
+                    return;
+                }
+                // Add observer to monitor route changes
+                [[NSNotificationCenter defaultCenter] addObserver:self
+                                                         selector:@selector(handleRouteChange:)
+                                                             name:AVAudioSessionRouteChangeNotification
+                                                           object:nil];
             }
 #endif
 
@@ -253,6 +267,10 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 
 - (void)cleanup
 {
+#if TARGET_OS_IOS
+    [[NSNotificationCenter defaultCenter] removeObserver:self name:AVAudioSessionRouteChangeNotification object:nil];
+#endif
+
     if (_mAudioUnit != nil) {
         [self stopAudioUnit];
         AudioUnitUninitialize(_mAudioUnit);
@@ -291,6 +309,39 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
     }
 }
 
+#if TARGET_OS_IOS
+- (void)handleRouteChange:(NSNotification *)notification {
+    AVAudioSessionRouteDescription *currentRoute = self.audioSession.currentRoute;
+    BOOL headphonesConnected = NO;
+    for (AVAudioSessionPortDescription *output in currentRoute.outputs) {
+        if ([output.portType isEqualToString:AVAudioSessionPortHeadphones]) {
+            headphonesConnected = YES;
+            break;
+        }
+    }
+
+    NSError *error = nil;
+    if ([self.chosenCategory isEqualToString:@"playAndRecord"]) {
+        // If headphones are connected, remove speaker override so system will route to them
+        if (headphonesConnected) {
+            [self.audioSession overrideOutputAudioPort:AVAudioSessionPortOverrideNone error:&error];
+            if (error) {
+                NSLog(@"Error removing speaker override: %@", error);
+            } else {
+                NSLog(@"Headphones connected, removing speaker override.");
+            }
+        } else {
+            // No headphones, ensure we are not routing through earpiece
+            [self.audioSession overrideOutputAudioPort:AVAudioSessionPortOverrideSpeaker error:&error];
+            if (error) {
+                NSLog(@"Error setting back to speaker: %@", error);
+            } else {
+                NSLog(@"Headphones disconnected, forcing speaker again.");
+            }
+        }
+    }
+}
+#endif
 
 static OSStatus RenderCallback(void *inRefCon,
                                AudioUnitRenderActionFlags *ioActionFlags,
@@ -331,7 +382,7 @@ static OSStatus RenderCallback(void *inRefCon,
         });
     }
 
-    if (shouldRequestMore) { 
+    if (shouldRequestMore) {
         instance.mDidInvokeFeedCallback = true;
         NSDictionary *response = @{@"remaining_frames": @(remainingFrames)};
         dispatch_async(dispatch_get_main_queue(), ^{
@@ -341,6 +392,5 @@ static OSStatus RenderCallback(void *inRefCon,
 
     return noErr;
 }
-
 
 @end
