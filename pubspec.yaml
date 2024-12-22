@@ -10,6 +10,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_web_plugins:
+    sdk: flutter
+  plugin_platform_interface: ^2.1.8
 
 flutter:
   plugin:
@@ -21,4 +24,6 @@ flutter:
         pluginClass: FlutterPcmSoundPlugin
       macos:
         pluginClass: FlutterPcmSoundPlugin
-
+      web:
+        pluginClass: FlutterPcmSoundWeb
+        fileName: flutter_pcm_sound_web.dart

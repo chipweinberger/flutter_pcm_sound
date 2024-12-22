@@ -1,115 +1,50 @@
 import 'dart:math' as math;
-import 'dart:async';
 import 'dart:typed_data';
-import 'package:flutter/services.dart';
+import 'package:flutter_pcm_sound/flutter_pcm_sound_platform_interface.dart';
 
-enum LogLevel {
-  none,
-  error,
-  standard,
-  verbose,
-}
-
-// Apple Documentation: https://developer.apple.com/documentation/avfaudio/avaudiosessioncategory
-enum IosAudioCategory {
-  soloAmbient, // same as ambient, but other apps will be muted. Other apps will be muted.
-  ambient, // same as soloAmbient, but other apps are not muted.
-  playback, // audio will play when phone is locked, like the music app
-}
+export 'flutter_pcm_sound_platform_interface.dart' show LogLevel, IosAudioCategory;
 
 class FlutterPcmSound {
-  static const MethodChannel _channel = const MethodChannel('flutter_pcm_sound/methods');
-
-  static Function(int)? onFeedSamplesCallback;
-
-  static LogLevel _logLevel = LogLevel.standard;
-
-  /// set log level
-  static Future<void> setLogLevel(LogLevel level) async {
-    _logLevel = level;
-    return await _invokeMethod('setLogLevel', {'log_level': level.index});
+  static Future<void> setLogLevel(LogLevel level) {
+    return FlutterPcmSoundPlatform.instance.setLogLevel(level);
   }
 
-  /// setup audio
-  /// 'avAudioCategory' is for iOS only,
-  /// enabled by default on other platforms
-  static Future<void> setup(
-      {required int sampleRate,
-      required int channelCount,
-      IosAudioCategory iosAudioCategory = IosAudioCategory.playback}) async {
-    return await _invokeMethod('setup', {
-      'sample_rate': sampleRate,
-      'num_channels': channelCount,
-      'ios_audio_category': iosAudioCategory.name,
+  static Future<void> setup({
+    required int sampleRate,
+    required int channelCount,
+    IosAudioCategory iosAudioCategory = IosAudioCategory.playback
+  }) {
+    return FlutterPcmSoundPlatform.instance.setup(
+      sampleRate: sampleRate,
+      channelCount: channelCount,
+      iosAudioCategory: iosAudioCategory,
+    );
+  }
+
+  static Future<void> feed(PcmArrayInt16 buffer) {
+    return FlutterPcmSoundPlatform.instance.feed(buffer.bytes.buffer.asUint8List());
+  }
+
+  static Future<void> setFeedThreshold(int threshold) {
+    return FlutterPcmSoundPlatform.instance.setFeedThreshold(threshold);
+  }
+
+  static void setFeedCallback(Function(int)? callback) {
+    FlutterPcmSoundPlatform.instance.setFeedCallback(callback);
+  }
+
+  static void start() {
+    assert(FlutterPcmSoundPlatform.instance != null);
+    FlutterPcmSoundPlatform.instance.setFeedCallback((remainingFrames) {
+      onFeedSamplesCallback?.call(remainingFrames);
     });
   }
 
-  /// queue 16-bit samples (little endian)
-  static Future<void> feed(PcmArrayInt16 buffer) async {
-    return await _invokeMethod('feed', {'buffer': buffer.bytes.buffer.asUint8List()});
+  static Future<void> release() {
+    return FlutterPcmSoundPlatform.instance.release();
   }
 
-  /// set the threshold at which we call the
-  /// feed callback. i.e. if we have less than X
-  /// queued frames, the feed callback will be invoked
-  static Future<void> setFeedThreshold(int threshold) async {
-    return await _invokeMethod('setFeedThreshold', {'feed_threshold': threshold});
-  }
-
-  /// callback is invoked when the audio buffer
-  /// is in danger of running out of queued samples
-  static void setFeedCallback(Function(int)? callback) {
-    onFeedSamplesCallback = callback;
-    _channel.setMethodCallHandler(_methodCallHandler);
-  }
-
-  /// convenience function:
-  ///   * invokes your feed callback
-  static void start() {
-    assert(onFeedSamplesCallback != null);
-    onFeedSamplesCallback!(0);
-  }
-
-  /// release all audio resources
-  static Future<void> release() async {
-    return await _invokeMethod('release');
-  }
-
-  static Future<T?> _invokeMethod<T>(String method, [dynamic arguments]) async {
-    if (_logLevel.index >= LogLevel.standard.index) {
-      String args = '';
-      if (method == 'feed') {
-        Uint8List data = arguments['buffer'];
-        if (data.lengthInBytes > 6) {
-          args = '(${data.lengthInBytes ~/ 2} samples) ${data.sublist(0, 6)} ...';
-        } else {
-          args = '(${data.lengthInBytes ~/ 2} samples) $data';
-        }
-      } else if (arguments != null) {
-        args = arguments.toString();
-      }
-      print("[PCM] invoke: $method $args");
-    }
-    return await _channel.invokeMethod(method, arguments);
-  }
-
-  static Future<dynamic> _methodCallHandler(MethodCall call) async {
-    if (_logLevel.index >= LogLevel.standard.index) {
-      String func = '[[ ${call.method} ]]';
-      String args = call.arguments.toString();
-      print("[PCM] $func $args");
-    }
-    switch (call.method) {
-      case 'OnFeedSamples':
-        int remainingFrames = call.arguments["remaining_frames"];
-        if (onFeedSamplesCallback != null) {
-          onFeedSamplesCallback!(remainingFrames);
-        }
-        break;
-      default:
-        print('Method not implemented');
-    }
-  }
+  static Function(int)? onFeedSamplesCallback;
 }
 
 class PcmArrayInt16 {
