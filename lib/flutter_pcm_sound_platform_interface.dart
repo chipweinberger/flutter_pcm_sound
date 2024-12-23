@@ -1,5 +1,4 @@
-import 'dart:typed_data';
-
+import 'package:flutter_pcm_sound/pcm_array_int16.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'package:flutter_pcm_sound/flutter_pcm_sound_method_channel.dart';
 
@@ -42,7 +41,7 @@ abstract class FlutterPcmSoundPlatform extends PlatformInterface {
     throw UnimplementedError('setup() has not been implemented.');
   }
 
-  Future<void> feed(Uint8List buffer) {
+  Future<void> feed(PcmArrayInt16 buffer) {
     throw UnimplementedError('feed() has not been implemented.');
   }
 

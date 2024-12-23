@@ -1,5 +1,5 @@
 import 'package:flutter/services.dart';
-import 'package:flutter_pcm_sound/flutter_pcm_sound_platform_interface.dart';
+import 'package:flutter_pcm_sound/flutter_pcm_sound.dart';
 
 class MethodChannelFlutterPcmSound extends FlutterPcmSoundPlatform {
   final methodChannel = const MethodChannel('flutter_pcm_sound/methods');
@@ -26,8 +26,12 @@ class MethodChannelFlutterPcmSound extends FlutterPcmSoundPlatform {
   }
 
   @override
-  Future<void> feed(Uint8List buffer) async {
-    return _invokeMethod('feed', {'buffer': buffer});
+  Future<void> feed(PcmArrayInt16 buffer) async {
+    final Uint8List rawBytes = buffer.bytes.buffer.asUint8List(
+        buffer.bytes.offsetInBytes,
+        buffer.bytes.lengthInBytes
+    );
+    return _invokeMethod('feed', {'buffer': rawBytes});
   }
 
   @override
