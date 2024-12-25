@@ -6,13 +6,13 @@
 #endif
 
 #define kOutputBus 0
-#define NAMESPACE @"flutter_pcm_sound" // Assuming this is the namespace you want
+#define NAMESPACE @"flutter_pcm_sound"
 
 typedef NS_ENUM(NSUInteger, LogLevel) {
-    none = 0,
-    error = 1,
-    standard = 2,
-    verbose = 3,
+none = 0,
+        error = 1,
+        standard = 2,
+        verbose = 3,
 };
 
 @interface FlutterPcmSoundPlugin ()
@@ -21,10 +21,14 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 @property(nonatomic) LogLevel mLogLevel;
 @property(nonatomic) AudioComponentInstance mAudioUnit;
 @property(nonatomic) NSMutableData *mSamples;
-@property(nonatomic) int mNumChannels; 
-@property(nonatomic) int mFeedThreshold; 
-@property(nonatomic) bool mDidInvokeFeedCallback; 
-@property(nonatomic) bool mDidSetup; 
+@property(nonatomic) int mNumChannels;
+@property(nonatomic) int mFeedThreshold;
+@property(nonatomic) bool mDidInvokeFeedCallback;
+@property(nonatomic) bool mDidSetup;
+
+// We’ll track the chosen audio category to know if we should override the speaker
+@property(nonatomic, copy) NSString *chosenCategory;
+
 @end
 
 @implementation FlutterPcmSoundPlugin
@@ -32,7 +36,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 + (void)registerWithRegistrar:(NSObject<FlutterPluginRegistrar> *)registrar
 {
     FlutterMethodChannel *methodChannel = [FlutterMethodChannel methodChannelWithName:NAMESPACE @"/methods"
-                                                                    binaryMessenger:[registrar messenger]];
+                                                                      binaryMessenger:[registrar messenger]];
 
     FlutterPcmSoundPlugin *instance = [[FlutterPcmSoundPlugin alloc] init];
     instance.mMethodChannel = methodChannel;
@@ -65,41 +69,55 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
             NSNumber *numChannels      = args[@"num_channels"];
 #if TARGET_OS_IOS
             NSString *iosAudioCategory = args[@"ios_audio_category"];
+            self.chosenCategory = iosAudioCategory;
 #endif
 
             self.mNumChannels = [numChannels intValue];
 
 #if TARGET_OS_IOS
-	        // handle background audio in iOS
+            // handle background audio in iOS
             // Default to Playback if no matching case is found
-            AVAudioSessionCategory category = AVAudioSessionCategorySoloAmbient;
+            AVAudioSessionCategory category = AVAudioSessionCategoryPlayback;
             if ([iosAudioCategory isEqualToString:@"ambient"]) {
                 category = AVAudioSessionCategoryAmbient;
             } else if ([iosAudioCategory isEqualToString:@"soloAmbient"]) {
                 category = AVAudioSessionCategorySoloAmbient;
             } else if ([iosAudioCategory isEqualToString:@"playback"]) {
                 category = AVAudioSessionCategoryPlayback;
+            } else if ([iosAudioCategory isEqualToString:@"playAndRecord"]) {
+                category = AVAudioSessionCategoryPlayAndRecord;
             }
-            
+
             // Set the AVAudioSession category based on the string value
             NSError *error = nil;
             [[AVAudioSession sharedInstance] setCategory:category error:&error];
             if (error) {
                 NSLog(@"Error setting AVAudioSession category: %@", error);
-                result([FlutterError errorWithCode:@"AVAudioSessionError" 
-                                        message:@"Error setting AVAudioSession category" 
-                                        details:[error localizedDescription]]);
+                result([FlutterError errorWithCode:@"AVAudioSessionError"
+                                           message:@"Error setting AVAudioSession category"
+                                           details:[error localizedDescription]]);
                 return;
             }
-            
-            // Activate the audio session
+
             [[AVAudioSession sharedInstance] setActive:YES error:&error];
             if (error) {
                 NSLog(@"Error activating AVAudioSession: %@", error);
-                result([FlutterError errorWithCode:@"AVAudioSessionError" 
-                                        message:@"Error activating AVAudioSession" 
-                                        details:[error localizedDescription]]);
+                result([FlutterError errorWithCode:@"AVAudioSessionError"
+                                           message:@"Error activating AVAudioSession"
+                                           details:[error localizedDescription]]);
                 return;
+            }
+
+            // If using playAndRecord, ensure we don't use the earpiece:
+            // Check current route. If built-in receiver is present, override to speaker.
+            if ([iosAudioCategory isEqualToString:@"playAndRecord"]) {
+                [self ensureNotEarpiece];
+
+                // Add observer to handle future route changes
+                [[NSNotificationCenter defaultCenter] addObserver:self
+                                                         selector:@selector(handleRouteChange:)
+                                                             name:AVAudioSessionRouteChangeNotification
+                                                           object:nil];
             }
 #endif
 
@@ -140,11 +158,11 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
             audioFormat.mBytesPerPacket = audioFormat.mBytesPerFrame * audioFormat.mFramesPerPacket;
 
             status = AudioUnitSetProperty(_mAudioUnit,
-                                    kAudioUnitProperty_StreamFormat,
-                                    kAudioUnitScope_Input,
-                                    kOutputBus,
-                                    &audioFormat,
-                                    sizeof(audioFormat));
+                                          kAudioUnitProperty_StreamFormat,
+                                          kAudioUnitScope_Input,
+                                          kOutputBus,
+                                          &audioFormat,
+                                          sizeof(audioFormat));
             if (status != noErr) {
                 NSString* message = [NSString stringWithFormat:@"AudioUnitSetProperty StreamFormat failed. OSStatus: %@", @(status)];
                 result([FlutterError errorWithCode:@"AudioUnitError" message:message details:nil]);
@@ -157,11 +175,11 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
             callback.inputProcRefCon = (__bridge void *)(self);
 
             status = AudioUnitSetProperty(_mAudioUnit,
-                                kAudioUnitProperty_SetRenderCallback,
-                                kAudioUnitScope_Global,
-                                kOutputBus,
-                                &callback,
-                                sizeof(callback));
+                                          kAudioUnitProperty_SetRenderCallback,
+                                          kAudioUnitScope_Global,
+                                          kOutputBus,
+                                          &callback,
+                                          sizeof(callback));
             if (status != noErr) {
                 NSString* message = [NSString stringWithFormat:@"AudioUnitSetProperty SetRenderCallback failed. OSStatus: %@", @(status)];
                 result([FlutterError errorWithCode:@"AudioUnitError" message:message details:nil]);
@@ -177,7 +195,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
             }
 
             self.mDidSetup = true;
-            
+
             result(@(true));
         }
         else if ([@"feed" isEqualToString:call.method])
@@ -237,14 +255,19 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 
 - (void)cleanup
 {
+#if TARGET_OS_IOS
+    [[NSNotificationCenter defaultCenter] removeObserver:self name:AVAudioSessionRouteChangeNotification object:nil];
+#endif
+
     if (_mAudioUnit != nil) {
+        [self stopAudioUnit];
         AudioUnitUninitialize(_mAudioUnit);
         AudioComponentInstanceDispose(_mAudioUnit);
         _mAudioUnit = nil;
         self.mDidSetup = false;
     }
     @synchronized (self.mSamples) {
-        self.mSamples = [NSMutableData new]; 
+        self.mSamples = [NSMutableData new];
     }
 }
 
@@ -254,11 +277,11 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
         UInt32 isRunning = 0;
         UInt32 size = sizeof(isRunning);
         OSStatus status = AudioUnitGetProperty(_mAudioUnit,
-                                            kAudioOutputUnitProperty_IsRunning,
-                                            kAudioUnitScope_Global,
-                                            0,
-                                            &isRunning,
-                                            &size);
+                                               kAudioOutputUnitProperty_IsRunning,
+                                               kAudioUnitScope_Global,
+                                               0,
+                                               &isRunning,
+                                               &size);
         if (status != noErr) {
             NSLog(@"AudioUnitGetProperty IsRunning failed. OSStatus: %@", @(status));
             return;
@@ -274,6 +297,38 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
     }
 }
 
+#if TARGET_OS_IOS
+- (void)handleRouteChange:(NSNotification *)notification {
+    [self ensureNotEarpiece];
+}
+
+- (void)ensureNotEarpiece {
+    AVAudioSessionRouteDescription *currentRoute = [AVAudioSession sharedInstance].currentRoute;
+    BOOL isEarpiece = NO;
+    for (AVAudioSessionPortDescription *output in currentRoute.outputs) {
+        // Built-in receiver is the "earpiece"
+        if ([output.portType isEqualToString:AVAudioSessionPortBuiltInReceiver]) {
+            isEarpiece = YES;
+            break;
+        }
+    }
+
+    if (isEarpiece) {
+        NSError *error = nil;
+        [[AVAudioSession sharedInstance] overrideOutputAudioPort:AVAudioSessionPortOverrideSpeaker error:&error];
+        if (error) {
+            NSLog(@"Error overriding to speaker: %@", error);
+        } else {
+            NSLog(@"Earpiece was selected, overriding to speaker.");
+        }
+    } else {
+        // If not using earpiece, do nothing. Headphones, AirPlay, etc. will remain as is.
+        // Also, if previously overridden, we can revert if desired:
+        // But generally, calling overrideOutputAudioPort(.none) is only needed if we previously forced the speaker.
+        // If we always force speaker only when the earpiece is chosen, we do not need to revert explicitly.
+    }
+}
+#endif
 
 static OSStatus RenderCallback(void *inRefCon,
                                AudioUnitRenderActionFlags *ioActionFlags,
@@ -293,7 +348,7 @@ static OSStatus RenderCallback(void *inRefCon,
         memset(ioData->mBuffers[0].mData, 0, ioData->mBuffers[0].mDataByteSize);
 
         NSUInteger bytesToCopy = MIN(ioData->mBuffers[0].mDataByteSize, [instance.mSamples length]);
-        
+
         // provide samples
         memcpy(ioData->mBuffers[0].mData, [instance.mSamples bytes], bytesToCopy);
 
@@ -314,7 +369,7 @@ static OSStatus RenderCallback(void *inRefCon,
         });
     }
 
-    if (shouldRequestMore) { 
+    if (shouldRequestMore) {
         instance.mDidInvokeFeedCallback = true;
         NSDictionary *response = @{@"remaining_frames": @(remainingFrames)};
         dispatch_async(dispatch_get_main_queue(), ^{
@@ -324,6 +379,5 @@ static OSStatus RenderCallback(void *inRefCon,
 
     return noErr;
 }
-
 
 @end
