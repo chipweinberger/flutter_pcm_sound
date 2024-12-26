@@ -12,7 +12,7 @@ FlutterPcmSound has zero dependencies besides Flutter, Android, iOS, and MacOS t
 
 ## Web
 
-Web support is implemented on [this fork](https://github.com/keyur2maru/flutter_pcm_sound/tree/master) by [@keyur2maru](https://github.com/keyur2maru)
+Web support is available on [this fork](https://github.com/keyur2maru/flutter_pcm_sound/tree/master) by [@keyur2maru](https://github.com/keyur2maru)
 
 ## *Not* for Audio Files
 
