@@ -15,6 +15,7 @@ enum IosAudioCategory {
   soloAmbient, // same as ambient, but other apps will be muted. Other apps will be muted.
   ambient, // same as soloAmbient, but other apps are not muted.
   playback, // audio will play when phone is locked, like the music app
+  playAndRecord // 
 }
 
 class FlutterPcmSound {
