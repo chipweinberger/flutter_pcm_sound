@@ -80,6 +80,9 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
             } else if ([iosAudioCategory isEqualToString:@"playback"]) {
                 category = AVAudioSessionCategoryPlayback;
             }
+            else if ([iosAudioCategory isEqualToString:@"playAndRecord"]) {
+                category = AVAudioSessionCategoryPlayAndRecord;
+            }
             
             // Set the AVAudioSession category based on the string value
             NSError *error = nil;
