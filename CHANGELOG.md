@@ -1,3 +1,6 @@
+## 3.1.3
+* **[Feature]** add `playAndRecord` iOS category
+
 ## 3.1.2
 * **[Improve]** add `setup` check before feed
 
