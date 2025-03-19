@@ -49,6 +49,21 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 {
     @try
     {
+#if TARGET_OS_OSX
+        if ([@"getAudioDevices" isEqualToString:call.method]) {
+            result([self getAudioOutputDevices]);
+        } else if ([@"setAudioDevice" isEqualToString:call.method]) {
+            NSString *deviceName = call.arguments[@"deviceName"];
+            if ([self setAudioOutputDeviceByName:deviceName]) {
+                result(nil);
+            } else {
+                result([FlutterError errorWithCode:@"DEVICE_NOT_FOUND"
+                                           message:@"Audio device not found"
+                                           details:nil]);
+            }
+        } else
+#endif
+
         if ([@"setLogLevel" isEqualToString:call.method])
         {
             NSDictionary *args = (NSDictionary*)call.arguments;
@@ -327,6 +342,97 @@ static OSStatus RenderCallback(void *inRefCon,
 
     return noErr;
 }
+
+#if TARGET_OS_OSX
+
+- (NSArray *)getAudioOutputDevices {
+    NSMutableArray *deviceList = [NSMutableArray array];
+    AudioObjectPropertyAddress propertyAddress = {
+        kAudioHardwarePropertyDevices,
+        kAudioObjectPropertyScopeGlobal,
+        kAudioObjectPropertyElementMain
+    };
+
+    UInt32 propertySize;
+    if (AudioObjectGetPropertyDataSize(kAudioObjectSystemObject, &propertyAddress, 0, NULL, &propertySize) != noErr) {
+        return deviceList;
+    }
+
+    int deviceCount = propertySize / sizeof(AudioObjectID);
+    AudioObjectID deviceIDs[deviceCount];
+
+    if (AudioObjectGetPropertyData(kAudioObjectSystemObject, &propertyAddress, 0, NULL, &propertySize, deviceIDs) != noErr) {
+        return deviceList;
+    }
+
+    for (int i = 0; i < deviceCount; i++) {
+        CFStringRef deviceName;
+        propertySize = sizeof(deviceName);
+        AudioObjectPropertyAddress nameAddress = {
+            kAudioDevicePropertyDeviceNameCFString,
+            kAudioObjectPropertyScopeOutput,
+            kAudioObjectPropertyElementMain
+        };
+
+        if (AudioObjectGetPropertyData(deviceIDs[i], &nameAddress, 0, NULL, &propertySize, &deviceName) == noErr) {
+            [deviceList addObject:(__bridge NSString *)deviceName];
+            CFRelease(deviceName);
+        }
+    }
+
+    return deviceList;
+}
+
+- (BOOL)setAudioOutputDeviceByName:(NSString *)deviceName {
+    AudioObjectPropertyAddress propertyAddress = {
+        kAudioHardwarePropertyDevices,
+        kAudioObjectPropertyScopeGlobal,
+        kAudioObjectPropertyElementMain
+    };
+
+    UInt32 propertySize;
+    if (AudioObjectGetPropertyDataSize(kAudioObjectSystemObject, &propertyAddress, 0, NULL, &propertySize) != noErr) {
+        return NO;
+    }
+
+    int deviceCount = propertySize / sizeof(AudioObjectID);
+    AudioObjectID deviceIDs[deviceCount];
+
+    if (AudioObjectGetPropertyData(kAudioObjectSystemObject, &propertyAddress, 0, NULL, &propertySize, deviceIDs) != noErr) {
+        return NO;
+    }
+
+    for (int i = 0; i < deviceCount; i++) {
+        CFStringRef currentDeviceName;
+        propertySize = sizeof(currentDeviceName);
+        AudioObjectPropertyAddress nameAddress = {
+            kAudioDevicePropertyDeviceNameCFString,
+            kAudioObjectPropertyScopeOutput,
+            kAudioObjectPropertyElementMain
+        };
+
+        if (AudioObjectGetPropertyData(deviceIDs[i], &nameAddress, 0, NULL, &propertySize, &currentDeviceName) == noErr) {
+            if ([(__bridge NSString *)currentDeviceName isEqualToString:deviceName]) {
+                AudioObjectPropertyAddress defaultOutputDeviceAddress = {
+                    kAudioHardwarePropertyDefaultOutputDevice,
+                    kAudioObjectPropertyScopeGlobal,
+                    kAudioObjectPropertyElementMain
+                };
+
+                if (AudioObjectSetPropertyData(kAudioObjectSystemObject, &defaultOutputDeviceAddress, 0, NULL, sizeof(AudioObjectID), &deviceIDs[i]) == noErr) {
+                    CFRelease(currentDeviceName);
+                    return YES;
+                }
+            }
+            CFRelease(currentDeviceName);
+        }
+    }
+
+    return NO;
+}
+
+#endif
+
 
 
 @end
