@@ -49,6 +49,21 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 {
     @try
     {
+#if TARGET_OS_OSX
+        if ([@"getAudioDevices" isEqualToString:call.method]) {
+            result([self getAudioOutputDevices]);
+        } else if ([@"setAudioDevice" isEqualToString:call.method]) {
+            NSString *deviceName = call.arguments[@"deviceName"];
+            if ([self setAudioOutputDeviceByName:deviceName]) {
+                result(nil);
+            } else {
+                result([FlutterError errorWithCode:@"DEVICE_NOT_FOUND"
+                                           message:@"Audio device not found"
+                                           details:nil]);
+            }
+        } else
+#endif
+
         if ([@"setLogLevel" isEqualToString:call.method])
         {
             NSDictionary *args = (NSDictionary*)call.arguments;
@@ -327,6 +342,118 @@ static OSStatus RenderCallback(void *inRefCon,
 
     return noErr;
 }
+
+#if TARGET_OS_OSX
+
+- (NSArray *)getAudioOutputDevices {
+    NSMutableArray *deviceList = [NSMutableArray array];
+    AudioObjectPropertyAddress propertyAddress = {
+        kAudioHardwarePropertyDevices,
+        kAudioObjectPropertyScopeGlobal,
+        kAudioObjectPropertyElementMain
+    };
+
+    UInt32 propertySize;
+    if (AudioObjectGetPropertyDataSize(kAudioObjectSystemObject, &propertyAddress, 0, NULL, &propertySize) != noErr) {
+        return deviceList;
+    }
+
+    int deviceCount = propertySize / sizeof(AudioObjectID);
+    AudioObjectID deviceIDs[deviceCount];
+
+    if (AudioObjectGetPropertyData(kAudioObjectSystemObject, &propertyAddress, 0, NULL, &propertySize, deviceIDs) != noErr) {
+        return deviceList;
+    }
+
+    for (int i = 0; i < deviceCount; i++) {
+        // Checking if the device supports the output audio stream
+        AudioObjectPropertyAddress streamAddress = {
+            kAudioDevicePropertyStreams,
+            kAudioObjectPropertyScopeOutput,
+            kAudioObjectPropertyElementMain
+        };
+
+        UInt32 streamPropertySize;
+        if (AudioObjectGetPropertyDataSize(deviceIDs[i], &streamAddress, 0, NULL, &streamPropertySize) != noErr || streamPropertySize == 0) {
+            continue; // If the device has no output streams, skip it
+        }
+
+        CFStringRef deviceName;
+        propertySize = sizeof(deviceName);
+        AudioObjectPropertyAddress nameAddress = {
+            kAudioDevicePropertyDeviceNameCFString,
+            kAudioObjectPropertyScopeGlobal,
+            kAudioObjectPropertyElementMain
+        };
+
+        if (AudioObjectGetPropertyData(deviceIDs[i], &nameAddress, 0, NULL, &propertySize, &deviceName) == noErr) {
+            [deviceList addObject:(__bridge NSString *)deviceName];
+            CFRelease(deviceName);
+        }
+    }
+
+    return deviceList;
+}
+
+- (BOOL)setAudioOutputDeviceByName:(NSString *)deviceName {
+    AudioObjectPropertyAddress propertyAddress = {
+        kAudioHardwarePropertyDevices,
+        kAudioObjectPropertyScopeGlobal,
+        kAudioObjectPropertyElementMain
+    };
+
+    UInt32 propertySize;
+    if (AudioObjectGetPropertyDataSize(kAudioObjectSystemObject, &propertyAddress, 0, NULL, &propertySize) != noErr) {
+        return NO;
+    }
+
+    int deviceCount = propertySize / sizeof(AudioObjectID);
+    AudioObjectID deviceIDs[deviceCount];
+
+    if (AudioObjectGetPropertyData(kAudioObjectSystemObject, &propertyAddress, 0, NULL, &propertySize, deviceIDs) != noErr) {
+        return NO;
+    }
+
+    for (int i = 0; i < deviceCount; i++) {
+        CFStringRef currentDeviceName;
+        propertySize = sizeof(currentDeviceName);
+        AudioObjectPropertyAddress nameAddress = {
+            kAudioDevicePropertyDeviceNameCFString,
+            kAudioObjectPropertyScopeOutput,
+            kAudioObjectPropertyElementMain
+        };
+
+        if (AudioObjectGetPropertyData(deviceIDs[i], &nameAddress, 0, NULL, &propertySize, &currentDeviceName) == noErr) {
+            if ([(__bridge NSString *)currentDeviceName isEqualToString:deviceName]) {
+                // Applying a device to the AudioUnit
+                OSStatus status = AudioUnitSetProperty(
+                    _mAudioUnit,
+                    kAudioOutputUnitProperty_CurrentDevice,
+                    kAudioUnitScope_Global,
+                    0,
+                    &deviceIDs[i],
+                    sizeof(AudioObjectID)
+                );
+
+                CFRelease(currentDeviceName);
+
+                if (status == noErr) {
+                    return YES;
+                } else {
+                    NSLog(@"Error setting AudioUnit output device: %d", status);
+                    return NO;
+                }
+            }
+            CFRelease(currentDeviceName);
+        }
+    }
+
+    return NO;
+}
+
+
+#endif
+
 
 
 @end

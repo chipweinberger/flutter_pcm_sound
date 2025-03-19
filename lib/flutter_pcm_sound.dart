@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:async';
 import 'dart:typed_data';
@@ -15,7 +16,7 @@ enum IosAudioCategory {
   soloAmbient, // same as ambient, but other apps will be muted. Other apps will be muted.
   ambient, // same as soloAmbient, but other apps are not muted.
   playback, // audio will play when phone is locked, like the music app
-  playAndRecord // 
+  playAndRecord //
 }
 
 class FlutterPcmSound {
@@ -31,13 +32,27 @@ class FlutterPcmSound {
     return await _invokeMethod('setLogLevel', {'log_level': level.index});
   }
 
+  // Getting output audio device list of operating system
+  static Future<List<String>> getAudioDevices() async {
+    if (Platform.isMacOS) {
+      final List<dynamic> devices = await _channel.invokeMethod('getAudioDevices');
+      return devices.cast<String>();
+    }
+    return [];
+  }
+
+  // Setting on output audio device at operating system for player
+  static Future<void> setAudioDevice(String deviceName) async {
+    if (Platform.isMacOS) {
+      await _channel.invokeMethod('setAudioDevice', {'deviceName': deviceName});
+    }
+    return;
+  }
+
   /// setup audio
   /// 'avAudioCategory' is for iOS only,
   /// enabled by default on other platforms
-  static Future<void> setup(
-      {required int sampleRate,
-      required int channelCount,
-      IosAudioCategory iosAudioCategory = IosAudioCategory.playback}) async {
+  static Future<void> setup({required int sampleRate, required int channelCount, IosAudioCategory iosAudioCategory = IosAudioCategory.playback}) async {
     return await _invokeMethod('setup', {
       'sample_rate': sampleRate,
       'num_channels': channelCount,
