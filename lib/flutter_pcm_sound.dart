@@ -49,6 +49,16 @@ class FlutterPcmSound {
     return;
   }
 
+  // Getting output audio volume, default volume = 1.0
+  static Future<double> getVolume() async {
+    return await _channel.invokeMethod('getVolume');
+  }
+
+  // Setting on output audio volume
+  static Future<void> setVolume(double volume) {
+    return _channel.invokeMethod('setVolume', {'volume': volume});
+  }
+
   /// setup audio
   /// 'avAudioCategory' is for iOS only,
   /// enabled by default on other platforms

@@ -20,6 +20,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 @property(nonatomic) FlutterMethodChannel *mMethodChannel;
 @property(nonatomic) LogLevel mLogLevel;
 @property(nonatomic) AudioComponentInstance mAudioUnit;
+@property(nonatomic) float volumeLevel;
 @property(nonatomic) NSMutableData *mSamples;
 @property(nonatomic) int mNumChannels; 
 @property(nonatomic) int mFeedThreshold; 
@@ -41,6 +42,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
     instance.mFeedThreshold = 8000;
     instance.mDidInvokeFeedCallback = false;
     instance.mDidSetup = false;
+    instance.volumeLevel = 1.0f;
 
     [registrar addMethodCallDelegate:instance channel:methodChannel];
 }
@@ -197,8 +199,13 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
             self.mDidSetup = true;
             
             result(@(true));
-        }
-        else if ([@"feed" isEqualToString:call.method])
+        } else if ([@"getVolume" isEqualToString:call.method]) {
+            result(@(_volumeLevel));
+        } else if ([@"setVolume" isEqualToString:call.method]) {
+            NSNumber *volume = call.arguments[@"volume"];
+            [self setVolume:volume];
+            result(@(true));
+        } else if ([@"feed" isEqualToString:call.method])
         {
             // setup check
             if (self.mDidSetup == false) {
@@ -315,6 +322,12 @@ static OSStatus RenderCallback(void *inRefCon,
         // provide samples
         memcpy(ioData->mBuffers[0].mData, [instance.mSamples bytes], bytesToCopy);
 
+        // modifying volume
+        int16_t *samples = (int16_t *)ioData->mBuffers[0].mData;
+        for (NSUInteger i = 0; i < bytesToCopy / sizeof(int16_t); i++) {
+            samples[i] = (int16_t)(samples[i] * instance.volumeLevel);
+        }
+
         // pop front bytes
         NSRange range = NSMakeRange(0, bytesToCopy);
         [instance.mSamples replaceBytesInRange:range withBytes:NULL length:0];
@@ -341,6 +354,13 @@ static OSStatus RenderCallback(void *inRefCon,
     }
 
     return noErr;
+}
+
+- (void)setVolume:(NSNumber *)volume {
+    float vol = [volume floatValue];
+    if (vol < 0.0f) vol = 0.0f;
+    if (vol > 1.0f) vol = 1.0f;
+    self.volumeLevel = vol;
 }
 
 #if TARGET_OS_OSX
