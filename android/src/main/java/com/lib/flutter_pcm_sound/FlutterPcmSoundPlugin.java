@@ -174,6 +174,10 @@ public class FlutterPcmSoundPlugin implements
                         return;
                     }
 
+                    // Reset the feed callback flag
+                    // note: must do this before pushing to mSamples
+                    mDidInvokeFeedCallback = false;
+
                     // Split for better performance
                     List<ByteBuffer> chunks = split(buffer, MAX_FRAMES_PER_BUFFER);
 
@@ -181,9 +185,6 @@ public class FlutterPcmSoundPlugin implements
                     for (ByteBuffer chunk : chunks) {
                         mSamples.put(chunk);
                     }
-
-                    // Reset the feed callback flag
-                    mDidInvokeFeedCallback = false;
 
                     result.success(true);
                     break;
