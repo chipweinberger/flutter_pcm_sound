@@ -1,3 +1,6 @@
+## 3.1.4
+* **[Fix]** Android: callback could be skipped sometimes
+
 ## 3.1.3
 * **[Feature]** add `playAndRecord` iOS category
 
