@@ -49,6 +49,7 @@ public class FlutterPcmSoundPlugin implements
 
     private long mFeedThreshold = 8000;
     private volatile boolean mDidInvokeFeedCallback = false;
+    private volatile boolean mDidSendZero = false;
 
     // Thread-safe queue for storing audio samples
     private final LinkedBlockingQueue<ByteBuffer> mSamples = new LinkedBlockingQueue<>();
@@ -145,8 +146,10 @@ public class FlutterPcmSoundPlugin implements
                         return;
                     }
 
+                    // reset
                     mSamples.clear();
                     mDidInvokeFeedCallback = false;
+                    mDidSendZero = false;
                     mShouldCleanup = false;
 
                     // start playback thread
@@ -174,9 +177,9 @@ public class FlutterPcmSoundPlugin implements
                         return;
                     }
 
-                    // Reset the feed callback flag
-                    // note: must do this before pushing to mSamples
+                    // reset flags
                     mDidInvokeFeedCallback = false;
+                    mDidSendZero = false;
 
                     // Split for better performance
                     List<ByteBuffer> chunks = split(buffer, MAX_FRAMES_PER_BUFFER);
@@ -277,9 +280,12 @@ public class FlutterPcmSoundPlugin implements
             // write
             mAudioTrack.write(data, data.remaining(), AudioTrack.WRITE_BLOCKING);
 
-            // invoke feed callback?
-            if (mRemainingFrames() <= mFeedThreshold && !mDidInvokeFeedCallback) {
+            long remaining = mRemainingFrames();
+            boolean isThresholdEvent = remaining <= mFeedThreshold && !mDidInvokeFeedCallback;
+            boolean isZeroCrossingEvent = mDidSendZero == false && remaining == 0;
+            if (isThresholdEvent || isZeroCrossingEvent) {
                 mDidInvokeFeedCallback = true;
+                mDidSendZero = remaining == 0;
                 mainThreadHandler.post(this::invokeFeedCallback);
             }
         }
