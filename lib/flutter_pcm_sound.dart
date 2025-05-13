@@ -15,7 +15,7 @@ enum IosAudioCategory {
   soloAmbient, // same as ambient, but other apps will be muted. Other apps will be muted.
   ambient, // same as soloAmbient, but other apps are not muted.
   playback, // audio will play when phone is locked, like the music app
-  playAndRecord // 
+  playAndRecord //
 }
 
 class FlutterPcmSound {
@@ -24,6 +24,8 @@ class FlutterPcmSound {
   static Function(int)? onFeedSamplesCallback;
 
   static LogLevel _logLevel = LogLevel.standard;
+
+  static int _remainingFrames = 0;
 
   /// set log level
   static Future<void> setLogLevel(LogLevel level) async {
@@ -68,7 +70,9 @@ class FlutterPcmSound {
   ///   * invokes your feed callback
   static void start() {
     assert(onFeedSamplesCallback != null);
-    onFeedSamplesCallback!(0);
+    if (_remainingFrames == 0) {
+      onFeedSamplesCallback!(0);
+    }
   }
 
   /// release all audio resources
@@ -102,9 +106,9 @@ class FlutterPcmSound {
     }
     switch (call.method) {
       case 'OnFeedSamples':
-        int remainingFrames = call.arguments["remaining_frames"];
+        _remainingFrames = call.arguments["remaining_frames"];
         if (onFeedSamplesCallback != null) {
-          onFeedSamplesCallback!(remainingFrames);
+          onFeedSamplesCallback!(_remainingFrames);
         }
         break;
       default:

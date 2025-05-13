@@ -67,9 +67,8 @@ class _PcmSoundAppState extends State<PcmSoundApp> {
             children: [
               ElevatedButton(
                 onPressed: () {
-                  FlutterPcmSound.setFeedCallback(_onFeed);
                   _isPlaying = true;
-                  _onFeed(0); // start feeding
+                  FlutterPcmSound.start();
                 },
                 child: Text('Play'),
               ),
