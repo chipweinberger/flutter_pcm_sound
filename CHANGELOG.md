@@ -1,3 +1,6 @@
+## 3.1.6
+* **[Improve]** calling `start` again when already started will do nothing, as expected.
+
 ## 3.1.5
 * **[Feature]** Android & iOS: invoke feed callback when remainingFrames=0 to signal that playback stopped
 
