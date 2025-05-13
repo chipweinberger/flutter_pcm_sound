@@ -24,6 +24,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 @property(nonatomic) int mNumChannels; 
 @property(nonatomic) int mFeedThreshold; 
 @property(nonatomic) bool mDidInvokeFeedCallback; 
+@property(nonatomic) bool mDidSendZero;
 @property(nonatomic) bool mDidSetup; 
 @end
 
@@ -40,6 +41,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
     instance.mSamples = [NSMutableData new];
     instance.mFeedThreshold = 8000;
     instance.mDidInvokeFeedCallback = false;
+    instance.mDidSendZero = false;
     instance.mDidSetup = false;
 
     [registrar addMethodCallDelegate:instance channel:methodChannel];
@@ -200,6 +202,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 
             // reset
             self.mDidInvokeFeedCallback = false;
+            self.mDidSendZero = false;
 
             // start
             OSStatus status = AudioOutputUnitStart(_mAudioUnit);
@@ -288,7 +291,7 @@ static OSStatus RenderCallback(void *inRefCon,
     FlutterPcmSoundPlugin *instance = (__bridge FlutterPcmSoundPlugin *)(inRefCon);
 
     NSUInteger remainingFrames;
-    BOOL shouldRequestMore = false;
+    BOOL isThresholdEvent = false;
 
     @synchronized (instance.mSamples) {
 
@@ -307,7 +310,7 @@ static OSStatus RenderCallback(void *inRefCon,
         remainingFrames = [instance.mSamples length] / (instance.mNumChannels * sizeof(short));
 
         // should request more frames?
-        shouldRequestMore = remainingFrames <= instance.mFeedThreshold && !instance.mDidInvokeFeedCallback;
+        isThresholdEvent = remainingFrames <= instance.mFeedThreshold && !instance.mDidInvokeFeedCallback;
     }
 
     // stop running, if needed
@@ -317,8 +320,11 @@ static OSStatus RenderCallback(void *inRefCon,
         });
     }
 
-    if (shouldRequestMore) { 
+    BOOL isZeroCrossingEvent = instance.mDidSendZero == false && remainingFrames == 0;
+
+    if (isThresholdEvent || isZeroCrossingEvent) { 
         instance.mDidInvokeFeedCallback = true;
+        instance.mDidSendZero = remainingFrames == 0;
         NSDictionary *response = @{@"remaining_frames": @(remainingFrames)};
         dispatch_async(dispatch_get_main_queue(), ^{
             [instance.mMethodChannel invokeMethod:@"OnFeedSamples" arguments:response];

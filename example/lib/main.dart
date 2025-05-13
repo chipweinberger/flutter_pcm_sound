@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_pcm_sound/flutter_pcm_sound.dart';
 
@@ -21,8 +20,8 @@ class PcmSoundApp extends StatefulWidget {
 }
 
 class _PcmSoundAppState extends State<PcmSoundApp> {
-
   static const int sampleRate = 48000;
+  bool _isPlaying = false;
 
   int _remainingFrames = 0;
   MajorScale scale = MajorScale(sampleRate: sampleRate, noteDuration: 0.20);
@@ -46,8 +45,10 @@ class _PcmSoundAppState extends State<PcmSoundApp> {
     setState(() {
       _remainingFrames = remainingFrames;
     });
-    List<int> frames = scale.generate(periods: 20);
-    await FlutterPcmSound.feed(PcmArrayInt16.fromList(frames));
+    if (_isPlaying) {
+      List<int> frames = scale.generate(periods: 20);
+      await FlutterPcmSound.feed(PcmArrayInt16.fromList(frames));
+    }
   }
 
   Widget build(BuildContext context) {
@@ -67,16 +68,14 @@ class _PcmSoundAppState extends State<PcmSoundApp> {
               ElevatedButton(
                 onPressed: () {
                   FlutterPcmSound.setFeedCallback(_onFeed);
+                  _isPlaying = true;
                   _onFeed(0); // start feeding
                 },
                 child: Text('Play'),
               ),
               ElevatedButton(
                 onPressed: () {
-                  FlutterPcmSound.setFeedCallback(null); // stop
-                  setState(() {
-                    _remainingFrames = 0;
-                  });
+                  _isPlaying = false;
                 },
                 child: Text('Stop'),
               ),
