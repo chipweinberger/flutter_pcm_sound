@@ -25,7 +25,7 @@ class FlutterPcmSound {
 
   static LogLevel _logLevel = LogLevel.standard;
 
-  static int _remainingFrames = 0;
+  static bool _needsStart = true;
 
   /// set log level
   static Future<void> setLogLevel(LogLevel level) async {
@@ -49,6 +49,7 @@ class FlutterPcmSound {
 
   /// queue 16-bit samples (little endian)
   static Future<void> feed(PcmArrayInt16 buffer) async {
+    if (_needsStart && buffer.count != 0) _needsStart = false;
     return await _invokeMethod('feed', {'buffer': buffer.bytes.buffer.asUint8List()});
   }
 
@@ -70,7 +71,7 @@ class FlutterPcmSound {
   ///   * invokes your feed callback
   static void start() {
     assert(onFeedSamplesCallback != null);
-    if (_remainingFrames == 0) {
+    if (_needsStart) {
       onFeedSamplesCallback!(0);
     }
   }
@@ -106,9 +107,10 @@ class FlutterPcmSound {
     }
     switch (call.method) {
       case 'OnFeedSamples':
-        _remainingFrames = call.arguments["remaining_frames"];
+        int remainingFrames = call.arguments["remaining_frames"];
+        _needsStart = remainingFrames == 0;
         if (onFeedSamplesCallback != null) {
-          onFeedSamplesCallback!(_remainingFrames);
+          onFeedSamplesCallback!(remainingFrames);
         }
         break;
       default:
@@ -138,6 +140,8 @@ class PcmArrayInt16 {
     }
     return PcmArrayInt16(bytes: byteData);
   }
+
+  int get count => bytes.lengthInBytes ~/ 2;
 
   operator [](int idx) {
     int vv = bytes.getInt16(idx * 2, Endian.host);
