@@ -33,6 +33,10 @@ To play audio, just keep calling `feed`.
 
 To stop audio, just stop calling `feed`.
 
+## Is Playing?
+
+When your feed callback hits `remainingFrames=0` you know playing stopped.
+
 ## Usage
 
 ```dart

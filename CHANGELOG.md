@@ -1,3 +1,6 @@
+## 3.1.5
+* **[Feature]** Android & iOS: invoke feed callback when remainingFrames=0 to signal that playback stopped
+
 ## 3.1.4
 * **[Fix]** Android: callback could be skipped sometimes
 
