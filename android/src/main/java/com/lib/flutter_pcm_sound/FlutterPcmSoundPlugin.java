@@ -87,16 +87,8 @@ public class FlutterPcmSoundPlugin implements
                     break;
                 }
                 case "setup": {
-                    Integer sampleRateObj = call.argument("sample_rate");
-                    Integer numChannelsObj = call.argument("num_channels");
-
-                    if (sampleRateObj == null || numChannelsObj == null) {
-                        result.error("InvalidArguments", "sample_rate and num_channels are required.", null);
-                        return;
-                    }
-
-                    int sampleRate = sampleRateObj;
-                    mNumChannels = numChannelsObj;
+                    int sampleRate = call.argument("sample_rate");
+                    mNumChannels = call.argument("num_channels");
 
                     // Cleanup existing resources if any
                     if (mAudioTrack != null) {
@@ -171,11 +163,6 @@ public class FlutterPcmSoundPlugin implements
                     }
 
                     byte[] buffer = call.argument("buffer");
-
-                    if (buffer == null || buffer.length == 0) {
-                        result.error("InvalidArguments", "buffer is required and cannot be empty", null);
-                        return;
-                    }
 
                     // reset flags
                     mDidInvokeFeedCallback = false;
