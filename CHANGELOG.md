@@ -1,3 +1,6 @@
+## 3.1.7
+* **[Fix]** Android: allow `feed` to be called with zero length buffer
+
 ## 3.1.6
 * **[Improve]** calling `start` again when already started will do nothing, as expected.
 
