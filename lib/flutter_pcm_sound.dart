@@ -68,11 +68,15 @@ class FlutterPcmSound {
   }
 
   /// convenience function:
-  ///   * invokes your feed callback
-  static void start() {
+  ///   * if needed, invokes your feed callback to start playback
+  ///   * returns true if your callback was invoked
+  static bool start() {
     assert(onFeedSamplesCallback != null);
     if (_needsStart) {
       onFeedSamplesCallback!(0);
+      return true;
+    } else {
+      return false;
     }
   }
 
