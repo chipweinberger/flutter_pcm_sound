@@ -1,3 +1,6 @@
+## 3.2.0
+* **[Feature]** `start` returns true if it invoked your callback
+
 ## 3.1.7
 * **[Fix]** Android: allow `feed` to be called with zero length buffer
 
