@@ -78,7 +78,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 
             self.mLogLevel = (LogLevel)[logLevelNumber integerValue];
 
-            result(@(true));
+            result(@YES);
         }
         else if ([@"setup" isEqualToString:call.method])
         {
@@ -93,8 +93,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
             self.mNumChannels = [numChannels intValue];
 
 #if TARGET_OS_IOS
-	        // handle background audio in iOS
-            // Default to Playback if no matching case is found
+            // iOS audio category
             AVAudioSessionCategory category = AVAudioSessionCategorySoloAmbient;
             if ([iosAudioCategory isEqualToString:@"ambient"]) {
                 category = AVAudioSessionCategoryAmbient;
@@ -204,7 +203,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 
             self.mDidSetup = true;
             
-            result(@(true));
+            result(@YES);
         }
         else if ([@"feed" isEqualToString:call.method])
         {
@@ -221,6 +220,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
             // This hides the temporary failure and keeps the API simple.
             if (!self.mIsAppActive && !self.mAllowBackgroundAudio) {
                 [self.mMethodChannel invokeMethod:@"OnFeedSamples" arguments:@{@"remaining_frames": @(0)}];
+                result(@YES);
                 return;
             }
 
@@ -235,6 +235,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
             self.mDidInvokeFeedCallback = false;
             self.mDidSendZero = false;
 
+            // start
             OSStatus status = AudioOutputUnitStart(_mAudioUnit);
             if (status != noErr) {
                 NSString* message = [NSString stringWithFormat:@"AudioOutputUnitStart failed. OSStatus: %@", @(status)];
@@ -242,7 +243,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
                 return;
             }
 
-            result(@(true));
+            result(@YES);
         }
         else if ([@"setFeedThreshold" isEqualToString:call.method])
         {
@@ -251,12 +252,12 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 
             self.mFeedThreshold = [feedThreshold intValue];
 
-            result(@(true));
+            result(@YES);
         }
         else if([@"release" isEqualToString:call.method])
         {
             [self cleanup];
-            result(@(true));
+            result(@YES);
         }
         else
         {
