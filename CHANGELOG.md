@@ -1,3 +1,6 @@
+## 3.2.3
+* **[Fix]** iOS: prevent audio blips when locking screen
+
 ## 3.2.2
 * **[Fix]** iOS: avoid `AudioOutputUnitStart` error 561015905 when resuming after screen lock → unlock
 
