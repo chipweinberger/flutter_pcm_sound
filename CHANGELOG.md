@@ -1,3 +1,9 @@
+## 3.2.2
+* **[Fix]** iOS: avoid `AudioOutputUnitStart` error 561015905 when resuming after screen lock → unlock
+
+## 3.2.1
+(redacted)
+
 ## 3.2.0
 * **[Feature]** `start` returns true if it invoked your callback
 
