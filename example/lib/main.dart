@@ -22,23 +22,32 @@ class PcmSoundApp extends StatefulWidget {
 class _PcmSoundAppState extends State<PcmSoundApp> {
   static const int sampleRate = 48000;
   bool _isPlaying = false;
-
   int _remainingFrames = 0;
   MajorScale scale = MajorScale(sampleRate: sampleRate, noteDuration: 0.20);
+
+  // Add a global key
+  final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
 
   @override
   void initState() {
     super.initState();
-    FlutterPcmSound.setLogLevel(LogLevel.verbose);
-    FlutterPcmSound.setup(sampleRate: sampleRate, channelCount: 1);
-    FlutterPcmSound.setFeedThreshold(sampleRate ~/ 10);
+    FlutterPcmSound.setLogLevel(LogLevel.verbose).onError(_showError);
+    FlutterPcmSound.setup(sampleRate: sampleRate, channelCount: 1).onError(_showError);
+    FlutterPcmSound.setFeedThreshold(sampleRate ~/ 10).onError(_showError);
     FlutterPcmSound.setFeedCallback(_onFeed);
   }
 
   @override
   void dispose() {
     super.dispose();
-    FlutterPcmSound.release();
+    FlutterPcmSound.release().onError(_showError);
+  }
+
+  bool _showError(Object? err, StackTrace st) {
+    _scaffoldMessengerKey.currentState?.showSnackBar(
+      SnackBar(content: Text("feed failed: $err")),
+    );
+    return true;
   }
 
   void _onFeed(int remainingFrames) async {
@@ -47,15 +56,15 @@ class _PcmSoundAppState extends State<PcmSoundApp> {
     });
     if (_isPlaying) {
       List<int> frames = scale.generate(periods: 20);
-      await FlutterPcmSound.feed(PcmArrayInt16.fromList(frames));
+      await FlutterPcmSound.feed(PcmArrayInt16.fromList(frames)).onError(_showError);
     }
   }
 
+  @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
+      scaffoldMessengerKey: _scaffoldMessengerKey, // attach key
+      theme: ThemeData(primarySwatch: Colors.blue),
       home: Scaffold(
         appBar: AppBar(
           centerTitle: true,
@@ -78,7 +87,7 @@ class _PcmSoundAppState extends State<PcmSoundApp> {
                 },
                 child: Text('Stop'),
               ),
-              Text('$_remainingFrames Remaining Frames')
+              Text('$_remainingFrames Remaining Frames'),
             ],
           ),
         ),
