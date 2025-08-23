@@ -39,11 +39,14 @@ class FlutterPcmSound {
   static Future<void> setup(
       {required int sampleRate,
       required int channelCount,
-      IosAudioCategory iosAudioCategory = IosAudioCategory.playback}) async {
+      IosAudioCategory iosAudioCategory = IosAudioCategory.playback,
+      bool iosAllowBackgroundAudio = false,
+      }) async {
     return await _invokeMethod('setup', {
       'sample_rate': sampleRate,
       'num_channels': channelCount,
       'ios_audio_category': iosAudioCategory.name,
+      'ios_allow_background_audio' : iosAllowBackgroundAudio,
     });
   }
 

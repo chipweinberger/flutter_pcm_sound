@@ -25,7 +25,9 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 @property(nonatomic) int mFeedThreshold; 
 @property(nonatomic) bool mDidInvokeFeedCallback; 
 @property(nonatomic) bool mDidSendZero;
-@property(nonatomic) bool mDidSetup; 
+@property(nonatomic) bool mDidSetup;
+@property(nonatomic) BOOL mIsAppActive;
+@property(nonatomic) BOOL mAllowBackgroundAudio;
 @end
 
 @implementation FlutterPcmSoundPlugin
@@ -43,9 +45,27 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
     instance.mDidInvokeFeedCallback = false;
     instance.mDidSendZero = false;
     instance.mDidSetup = false;
+    instance.mIsAppActive = true;
+    instance.mAllowBackgroundAudio = false;
+
+#if TARGET_OS_IOS
+    NSNotificationCenter *nc = [NSNotificationCenter defaultCenter];
+    [nc addObserver:instance selector:@selector(onWillResignActive:) name:UIApplicationWillResignActiveNotification object:nil];
+    [nc addObserver:instance selector:@selector(onDidBecomeActive:) name:UIApplicationDidBecomeActiveNotification object:nil];
+#endif
 
     [registrar addMethodCallDelegate:instance channel:methodChannel];
 }
+
+#if TARGET_OS_IOS
+- (void)onWillResignActive:(NSNotification *)note {
+  self.mIsAppActive = NO;
+}
+
+- (void)onDidBecomeActive:(NSNotification *)note {
+  self.mIsAppActive = YES;
+}
+#endif
 
 - (void)handleMethodCall:(FlutterMethodCall *)call result:(FlutterResult)result
 {
@@ -67,6 +87,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
             NSNumber *numChannels      = args[@"num_channels"];
 #if TARGET_OS_IOS
             NSString *iosAudioCategory = args[@"ios_audio_category"];
+            self.mAllowBackgroundAudio = [args[@"ios_allow_background_audio"] boolValue];
 #endif
 
             self.mNumChannels = [numChannels intValue];
@@ -193,6 +214,16 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
                 return;
             }
 
+            // If background audio is not allowed, feeding immediately after a lock→unlock
+            // can cause AudioOutputUnitStart to fail with 561015905 because the app is not
+            // fully active yet. Rather than surfacing this transient error, we report success
+            // and tell Dart the frames were consumed, prompting it to continue feeding.
+            // This hides the temporary failure and keeps the API simple.
+            if (!self.mIsAppActive && !self.mAllowBackgroundAudio) {
+                [self.mMethodChannel invokeMethod:@"OnFeedSamples" arguments:@{@"remaining_frames": @(0)}];
+                return;
+            }
+
             NSDictionary *args = (NSDictionary*)call.arguments;
             FlutterStandardTypedData *buffer = args[@"buffer"];
 
@@ -204,7 +235,6 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
             self.mDidInvokeFeedCallback = false;
             self.mDidSendZero = false;
 
-            // start
             OSStatus status = AudioOutputUnitStart(_mAudioUnit);
             if (status != noErr) {
                 NSString* message = [NSString stringWithFormat:@"AudioOutputUnitStart failed. OSStatus: %@", @(status)];

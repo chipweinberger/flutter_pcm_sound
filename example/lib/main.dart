@@ -19,18 +19,21 @@ class PcmSoundApp extends StatefulWidget {
   _PcmSoundAppState createState() => _PcmSoundAppState();
 }
 
-class _PcmSoundAppState extends State<PcmSoundApp> {
+class _PcmSoundAppState extends State<PcmSoundApp> with WidgetsBindingObserver {
   static const int sampleRate = 48000;
   bool _isPlaying = false;
+  bool _isActive = true; 
   int _remainingFrames = 0;
   MajorScale scale = MajorScale(sampleRate: sampleRate, noteDuration: 0.20);
 
-  // Add a global key
-  final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
+  final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey =
+      GlobalKey<ScaffoldMessengerState>();
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this); // register observer
+
     FlutterPcmSound.setLogLevel(LogLevel.verbose).onError(_showError);
     FlutterPcmSound.setup(sampleRate: sampleRate, channelCount: 1).onError(_showError);
     FlutterPcmSound.setFeedThreshold(sampleRate ~/ 10).onError(_showError);
@@ -39,8 +42,16 @@ class _PcmSoundAppState extends State<PcmSoundApp> {
 
   @override
   void dispose() {
-    super.dispose();
+    WidgetsBinding.instance.removeObserver(this); // clean up
     FlutterPcmSound.release().onError(_showError);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    setState(() {
+      _isActive = state == AppLifecycleState.resumed;
+    });
   }
 
   bool _showError(Object? err, StackTrace st) {
@@ -54,22 +65,22 @@ class _PcmSoundAppState extends State<PcmSoundApp> {
     setState(() {
       _remainingFrames = remainingFrames;
     });
-    if (_isPlaying) {
+
+    // Only feed if playing AND app is active
+    if (_isPlaying && _isActive) {
       List<int> frames = scale.generate(periods: 20);
-      await FlutterPcmSound.feed(PcmArrayInt16.fromList(frames)).onError(_showError);
+      await FlutterPcmSound.feed(PcmArrayInt16.fromList(frames))
+          .onError(_showError);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      scaffoldMessengerKey: _scaffoldMessengerKey, // attach key
+      scaffoldMessengerKey: _scaffoldMessengerKey,
       theme: ThemeData(primarySwatch: Colors.blue),
       home: Scaffold(
-        appBar: AppBar(
-          centerTitle: true,
-          title: Text('Flutter PCM Sound'),
-        ),
+        appBar: AppBar(centerTitle: true, title: Text('Flutter PCM Sound')),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
