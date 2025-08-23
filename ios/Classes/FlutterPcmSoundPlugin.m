@@ -219,6 +219,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
             // and tell Dart the frames were consumed, prompting it to continue feeding.
             // This hides the temporary failure and keeps the API simple.
             if (!self.mIsAppActive && !self.mAllowBackgroundAudio) {
+                @synchronized (self.mSamples) {[self.mSamples setLength:0];}
                 [self.mMethodChannel invokeMethod:@"OnFeedSamples" arguments:@{@"remaining_frames": @(0)}];
                 result(@YES);
                 return;
