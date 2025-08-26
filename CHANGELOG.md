@@ -1,3 +1,6 @@
+## 3.2.4
+* **[Fix]** calling `start` could cause null deref
+
 ## 3.2.3
 * **[Fix]** iOS: prevent audio blips when locking screen
 
