@@ -28,8 +28,8 @@ You can lower the feed threshold using `setFeedThreshold` to achieve real time a
 Unlike traditional audio libraries which use a high-frequency timer-based audio callback, `flutter_pcm_sound` uses a low-frequency event-based callback. This integrates more seamlessly in the existing Flutter event loop, without necessitating an Isolate to ensure precise timing.
 
 Your feed callback is invoked _once_ for each of these events:
-- **Low-buffer event** – when the number of buffered frames falls **below** the threshold set with `setFeedThreshold`.
-- **Zero event** – when the buffer is fully drained (`remainingFrames == 0`).
+- **Low-buffer event** – when the number of buffered frames falls **below** the threshold set with `setFeedThreshold`, i.e `remainingFrames < threshold`.
+- **Zero event** – when the buffer is fully drained, i.e. `remainingFrames == 0`.
 
 **Note:** _once_ means once per `feed()` — every time you feed new data, the plugin will trigger another low-buffer or zero event when necessary.
 
@@ -39,13 +39,13 @@ Your feed callback is invoked _once_ for each of these events:
 
 ## Timer Based Feeding
 
-If you prefer, it's easy to wrap `flutter_pcm_sound` to simulate traditional timer-based feeding, as opposed to event-based.
+If you prefer, it's easy to wrap `flutter_pcm_sound` to simulate traditional timer-based feeding, i.e. invoking your feed callback at a specific preferrred rate, using a Dart timer.
 
- 1) set a large feed threshold so that `flutter_pcm_sound` regularly tells you its `remainingFrames` 
+ 1) Set a large feed threshold so that `flutter_pcm_sound` regularly tells you its `remainingFrames` 
  
- 2) start a Dart-side `Timer.periodic(...)` or `Ticker` 
+ 2) Start a Dart-side `Timer.periodic(...)` or `Ticker` 
  
- 3) use that timer to invoke a new feed callback and pass it the `remainingFrames` minus the elapsed time since the original callback. 
+ 3) On each timer tick, call your feed callback an estimated remaining frames. i.e. `estimatedRemainingFrames = remainingFrames - (elapsedSeconds * sampleRate)`
  
  <details>
 <summary> For an example, click here</summary>
@@ -56,7 +56,8 @@ import 'package:flutter_pcm_sound/flutter_pcm_sound.dart';
 
 typedef FeedCallback = List<int> Function(int remainingFrames);
 
-class SoundTimer {
+/// wraps FlutterPcmSound w/ timer-based feeding
+class FlutterPcmTimer {
   // --- config ---
   static int _sampleRate = 48000;
   static int _channelCount = 1;
@@ -111,7 +112,7 @@ class SoundTimer {
   
   static void setFeedCallback(FeedCallback? cb) => _onFeed = cb;
 
-  static Future<void> start() async {
+  static Future<void> start() {
     if (!_isSetup) throw StateError('Call SoundTimer.setup(...) first.');
     if (_playing) return;
 
@@ -123,7 +124,7 @@ class SoundTimer {
   }
 
   /// Stop. Guarantees no further feed() calls after this returns.
-  static Future<void> stop() async {
+  static Future<void> stop() {
     if (!_playing && _timer == null) return;
     _playing = false;
     _timer?.cancel();
