@@ -1,3 +1,6 @@
+## 3.3.2
+* **[Docs]** update readme
+
 ## 3.3.1
 * **[Fix]** more potential race conditions (theoretical)
 
