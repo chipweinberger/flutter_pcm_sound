@@ -1,3 +1,6 @@
+## 3.2.5
+* **[Docs]** document when the feed callback is invoked
+
 ## 3.2.4
 * **[Fix]** calling `start` could cause null deref
 
