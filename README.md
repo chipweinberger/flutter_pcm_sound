@@ -25,19 +25,17 @@ You can lower the feed threshold using `setFeedThreshold` to achieve real time a
 
 ## Event Based Feeding
 
-Unlike traditional audio libraries which use a high-frequency timer-based audio callback, `flutter_pcm_sound` uses a low-frequency event-based callback.
+Unlike traditional audio libraries which use a high-frequency timer-based audio callback, `flutter_pcm_sound` uses a low-frequency event-based callback. This integrates more seamlessly in the existing Flutter event loop, without necessitating an Isolate to ensure precise timing.
 
 Your feed callback is invoked _once_ for each of these events:
 - **Low-buffer event** – when the number of buffered frames falls **below** the threshold set with `setFeedThreshold`.
 - **Zero event** – when the buffer is fully drained (`remainingFrames == 0`).
 
-**Note:** _once_ means once per `feed()` — every time you feed new data, it allows the plugin to trigger another low-buffer or zero event.
+**Note:** _once_ means once per `feed()` — every time you feed new data, the plugin will trigger another low-buffer or zero event when necessary.
 
 > 💡 **Tip:**  By altering how many extra samples you `feed` beyond your threshold, you can control how often `flutter_pcm_sound` invokes your feed callback.
 
-> 🧠 **Why event-based feeding?** You might wonder why `flutter_pcm_sound` doesn’t just use a timer to request more samples every few milliseconds like every other audio library. The problem is asynchronous timing. Whether the timer runs on the Dart or native side, your feed callbacks get bunched up behind Dart UI work, leading to audio delays, pops, & excess work, and means it's not really a reliable "timer". Event-based better reflects the limitations of Dart timing and is more efficient.
-
-> 💡 **Tip:** If you prefer, it's easy to wrap `flutter_pcm_sound` to simulate a traditional timer-based callback. 1) set a extremely large feed threshold so that `flutter_pcm_sound` regularly tells you its `remainingFrames` 2) start a Dart-side `Timer.periodic(...)` or `Ticker` 3) invoke a new callback using this timer and pass it `remainingFrames` minus elapsed time, so that the callback knows how much to feed.
+> 💡 **Tip:** If you prefer, it's easy to wrap `flutter_pcm_sound` to simulate traditional timer-based feeding. 1) set a large feed threshold so that `flutter_pcm_sound` regularly tells you its `remainingFrames` 2) start a Dart-side `Timer.periodic(...)` or `Ticker` 3) use that timer to invoke a new feed callback and pass it the `remainingFrames` minus the elapsed time since the original callback.
 
 > 💡 **Tip:** Consider running your sound code in a Dart `Isolate`, so that it is decoupled from UI framedrops.
 
@@ -49,7 +47,7 @@ To stop audio, just stop calling `feed`.
 
 > 🧠 **Why no start & stop functions?** two reasons. 1) unlike a timer-based API, in an event-based API there's no audio callback thread you need to "start". You just feed when the events arrive. 2) In Flutter, calling native is always async. If playback depended on `await start()` and `await stop()`, you’d have additional, needless delays which can lead to stuttery audio. By using a simple "just feed" approach, we avoid this.
 
-> 💡 **Tip:** If you really want a traditional timer-based API with `start()` and `stop()`, I recommend wrapping `flutter_pcm_sound` as described in the [Event-Based Feeding](#event-based-feeding) section preferably in an `Isolate`.
+> 💡 **Tip:** If you prefer a traditional timer-based API with `start()` and `stop()`, I recommend wrapping `flutter_pcm_sound` as described in the [Event-Based Feeding](#event-based-feeding) tips.
 
 ## Is Playing?
 
