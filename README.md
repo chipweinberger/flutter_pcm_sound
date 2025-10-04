@@ -47,7 +47,119 @@ If you prefer, it's easy to wrap `flutter_pcm_sound` to simulate traditional tim
  
  3) use that timer to invoke a new feed callback and pass it the `remainingFrames` minus the elapsed time since the original callback. 
  
- For an example, see [here](https://github.com/chipweinberger/flutter_pcm_sound/issues/43#issuecomment-3368369457)
+ <details>
+<summary> For an example, click here</summary>
+
+```dart
+import 'dart:async';
+import 'package:flutter_pcm_sound/flutter_pcm_sound.dart';
+
+typedef FeedCallback = List<int> Function(int remainingFrames);
+
+class SoundTimer {
+  // --- config ---
+  static int _sampleRate = 48000;
+  static int _channelCount = 1;
+  static int _tickHz = 60;
+
+  // --- state ---
+  static FeedCallback? _onFeed;
+  static bool _isSetup = false;
+  static bool _playing = false;
+  static Timer? _timer;
+
+  // last native event snapshot
+  static int _lastEventFrames = 0;
+  static int _lastEventMicros = 0; // timestamp
+
+  // for UI
+  static bool get isPlaying => _playing;
+
+  static Future<void> setup({
+    int sampleRate = 48000,
+    int channelCount = 1,
+    int tickHz = 60,
+    IosAudioCategory iosAudioCategory = IosAudioCategory.playback,
+    bool iosAllowBackgroundAudio = false,
+  }) async {
+    _sampleRate = sampleRate;
+    _channelCount = channelCount;
+    _tickHz = tickHz;
+
+    await FlutterPcmSound.setup(
+      sampleRate: _sampleRate,
+      channelCount: _channelCount,
+      iosAudioCategory: iosAudioCategory,
+      iosAllowBackgroundAudio: iosAllowBackgroundAudio,
+    );
+
+    // Huge threshold → plugin periodically reports remainingFrames.
+    await FlutterPcmSound.setFeedThreshold(_sampleRate * 60 * 60 * 24 * 365);
+
+    FlutterPcmSound.setFeedCallback((remaining) {
+      _lastEventFrames = remaining;
+      _lastEventMicros = _nowMicros();
+      if (remaining == 0 && _playing) {
+        // Refill ASAP, but outside the native callback.
+        scheduleMicrotask(_tick);
+      }
+    });
+
+    _isSetup = true;
+  }
+
+  
+  static void setFeedCallback(FeedCallback? cb) => _onFeed = cb;
+
+  static Future<void> start() async {
+    if (!_isSetup) throw StateError('Call SoundTimer.setup(...) first.');
+    if (_playing) return;
+
+    _playing = true;
+    FlutterPcmSound.start();
+
+    final period = Duration(milliseconds: (1000 / _tickHz).round());
+    _timer ??= Timer.periodic(period, (_) => _tick());
+  }
+
+  /// Stop. Guarantees no further feed() calls after this returns.
+  static Future<void> stop() async {
+    if (!_playing && _timer == null) return;
+    _playing = false;
+    _timer?.cancel();
+    _timer = null;
+  }
+
+  // --- internals ---
+
+  static void _tick() async {
+    if (!_playing) return;
+
+    final estRemaining = _estimatedRemainingFramesNow();
+    if (_onFeed == null) return;
+
+    final samples = _onFeed!(estRemaining);
+    if (samples.isEmpty) return;
+
+    if (!_playing) return; // guard before async
+    await FlutterPcmSound.feed(PcmArrayInt16.fromList(samples));
+  }
+
+  static int _estimatedRemainingFramesNow() {
+    final lastFrames = _lastEventFrames;
+    final lastMicros = _lastEventMicros;
+    if (lastMicros == 0) return 0;
+
+    final elapsedMicros = _nowMicros() - lastMicros;
+    final elapsedFrames = ((elapsedMicros / 1e6) * _sampleRate).round();
+    final est = lastFrames - elapsedFrames;
+    return est > 0 ? est : 0;
+  }
+
+  static int _nowMicros() => DateTime.now().microsecondsSinceEpoch;
+}
+```
+</details>
 
 ## One-Pedal Driving
 
