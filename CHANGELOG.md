@@ -1,3 +1,6 @@
+## 3.2.6
+* **[Docs]** more docs clarifications
+
 ## 3.2.5
 * **[Docs]** document when the feed callback is invoked
 
