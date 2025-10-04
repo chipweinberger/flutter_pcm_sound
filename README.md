@@ -45,8 +45,6 @@ To play audio, just keep calling `feed`.
 
 To stop audio, just stop calling `feed`.
 
-> 🧠 **Why no start & stop functions?** two reasons. 1) unlike a timer-based API, in an event-based API there's no audio callback thread you need to "start". You just feed when the events arrive. 2) In Flutter, calling native is always async. If playback depended on `await start()` and `await stop()`, you’d have additional, needless delays which can lead to stuttery audio. By using a simple "just feed" approach, we avoid this.
-
 > 💡 **Tip:** If you prefer a traditional timer-based API with `start()` and `stop()`, I recommend wrapping `flutter_pcm_sound` as described in the [Event-Based Feeding](#event-based-feeding) tips.
 
 ## Is Playing?
