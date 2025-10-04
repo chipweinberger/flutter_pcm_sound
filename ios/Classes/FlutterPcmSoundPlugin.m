@@ -350,6 +350,9 @@ static OSStatus RenderCallback(void *inRefCon,
     // stop running, if needed
     if (remainingFrames == 0) {
         dispatch_async(dispatch_get_main_queue(), ^{
+            @synchronized (instance.mSamples) { // re-check
+                if ([instance.mSamples length] != 0) {return;}
+            }
             [instance stopAudioUnit];
         });
     }
