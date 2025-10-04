@@ -214,7 +214,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
             }
 
             // If background audio is not allowed, feeding immediately after a lock→unlock
-            // can cause AudioOutputUnitStart to fail with 561015905 because the app is not
+            // can cause AudioOutputUnitStart to fail with code 561015905 because the app is not
             // fully active yet. Rather than surfacing this transient error, we report success
             // and tell Dart the frames were consumed, prompting it to continue feeding.
             // This hides the temporary failure and keeps the API simple.

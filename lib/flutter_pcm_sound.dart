@@ -66,7 +66,6 @@ class FlutterPcmSound {
   /// Your feed callback is invoked _once_ for each of these events:
   /// - Low-buffer event: when the number of buffered frames falls below the threshold set with `setFeedThreshold`
   /// - Zero event: when the buffer is fully drained (`remainingFrames == 0`)
-  ///
   /// Note: once means once per `feed()`. Every time you feed new data, it allows
   /// the plugin to trigger another low-buffer or zero event.
   static void setFeedCallback(Function(int)? callback) {
