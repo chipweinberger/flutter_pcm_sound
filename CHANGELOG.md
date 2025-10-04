@@ -1,5 +1,8 @@
+## 3.3.1
+* **[Fix]** more potential race conditions (theoretical)
+
 ## 3.3.0
-* **[Fix]** race conditions that could theoretically cause `OnFeedSamples` to misfire
+* **[Fix]** potential race conditions that could theoretically cause `OnFeedSamples` to misfire
 
 ## 3.2.6
 * **[Docs]** more docs clarifications
