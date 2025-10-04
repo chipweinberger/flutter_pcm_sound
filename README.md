@@ -27,11 +27,25 @@ In contrast to [raw_sound](https://pub.dev/packages/raw_sound), FlutterPcmSound 
 
 You can lower the feed threshold using `setFeedThreshold` to achieve real time audio, or increase it to have a cushy buffer.
 
+## Event Based Feeding
+
+Your feed callback is invoked _once_ for each of these events:
+- **Low-buffer event** – when the number of buffered frames falls **below** the threshold set with `setFeedThreshold`.
+- **Zero event** – when the buffer is fully drained (`remainingFrames == 0`).
+
+**Note:** _once_ means once per `feed()` — every time you feed new data, it allows the plugin to trigger another low-buffer or zero event.
+
+> 🧠 **Why event-based feeding?** You might wonder why `flutter_pcm_sound` doesn’t just use a timer to request more samples every few milliseconds like every other audio library. The problem is asynchronous timing. Whether the timer runs on the Dart or native side, your feed callbacks get bunched up behind Dart UI work, leading to audio delays, pops, & excess work, and means it's not really a reliable "timer". Event-based better reflects the reality of Dart timing, and is more efficient.
+
+> 💡 **Tip:** You can still emulate timer-style feeding by setting a very large feed threshold so that `flutter_pcm_sound` calls your feed callback regularly. From there, you can also optionally run a Dart-side `Timer.periodic(...)` or `Ticker` and estimate `remainingFrames`  from your last callback + the elapsed time since it fired.
+
 ## One-Pedal Driving
 
 To play audio, just keep calling `feed`. 
 
 To stop audio, just stop calling `feed`.
+
+> 💡 **How to think about it:** In a traditional sound library you’d call `start()`, which begins invoking your feed callback, and later call `stop()` to end it. `flutter_pcm_sound` works almost the same way — you can still call the `start()` convenience function if you want. The difference is that you don’t need an explicit `stop()`: if you stop feeding samples, `flutter_pcm_sound` will naturally stop invoking your feed callback once the buffer runs out. When that happens, your callback will see `remainingFrames = 0`, which indicates playback has ended. This is conserves power and CPU performance.
 
 ## Is Playing?
 
