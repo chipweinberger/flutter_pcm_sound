@@ -250,7 +250,9 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
             NSDictionary *args = (NSDictionary*)call.arguments;
             NSNumber *feedThreshold = args[@"feed_threshold"];
 
-            self.mFeedThreshold = [feedThreshold intValue];
+            @synchronized (self.mSamples) {
+                self.mFeedThreshold = [feedThreshold intValue];
+            }
 
             result(@YES);
         }
@@ -275,6 +277,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 - (void)cleanup
 {
     if (_mAudioUnit != nil) {
+        AudioOutputUnitStop(_mAudioUnit);
         AudioUnitUninitialize(_mAudioUnit);
         AudioComponentInstanceDispose(_mAudioUnit);
         _mAudioUnit = nil;
@@ -323,6 +326,7 @@ static OSStatus RenderCallback(void *inRefCon,
 
     NSUInteger totalFeeds = 0;
     NSUInteger remainingFrames;
+    NSUInteger feedThreshold = 0;
 
     @synchronized (instance.mSamples) {
 
@@ -341,10 +345,11 @@ static OSStatus RenderCallback(void *inRefCon,
         // grab shared data
         remainingFrames = [instance.mSamples length] / (instance.mNumChannels * sizeof(short));
         totalFeeds = instance.mTotalFeeds;
+        feedThreshold = (NSUInteger)instance.mFeedThreshold;
     }
 
     // check for events
-    BOOL isLowBufferEvent = (remainingFrames <= instance.mFeedThreshold) && (instance.mLastLowBufferFeed != totalFeeds);
+    BOOL isLowBufferEvent = (remainingFrames <= feedThreshold) && (instance.mLastLowBufferFeed != totalFeeds);
     BOOL isZeroCrossingEvent = (remainingFrames == 0) && (instance.mLastZeroFeed != totalFeeds);
 
     // stop running, if needed

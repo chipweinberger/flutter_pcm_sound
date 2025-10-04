@@ -178,7 +178,12 @@ public class FlutterPcmSoundPlugin implements
                     break;
                 }
                 case "setFeedThreshold": {
-                    mFeedThreshold = ((Number) call.argument("feed_threshold")).longValue();
+                    long feedThreshold = ((Number) call.argument("feed_threshold")).longValue();
+
+                    synchronized (mSamples) {
+                        mFeedThreshold = feedThreshold;
+                    }
+
                     result.success(true);
                     break;
                 }
@@ -253,6 +258,7 @@ public class FlutterPcmSoundPlugin implements
 
             long remainingFrames;
             long totalFeeds;
+            long feedThreshold;
 
             // grab shared data
             synchronized (mSamples) {
@@ -262,10 +268,11 @@ public class FlutterPcmSoundPlugin implements
                 }
                 remainingFrames = totalBytes / (2 * mNumChannels);
                 totalFeeds = mTotalFeeds;
+                feedThreshold = mFeedThreshold;
             }
 
             // check for events
-            boolean isLowBufferEvent = (remainingFrames <= mFeedThreshold) && (mLastLowBufferFeed != totalFeeds);
+            boolean isLowBufferEvent = (remainingFrames <= feedThreshold) && (mLastLowBufferFeed != totalFeeds);
             boolean isZeroCrossingEvent = (remainingFrames == 0) && (mLastZeroFeed != totalFeeds);
 
             // send events
