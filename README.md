@@ -35,9 +35,9 @@ Your feed callback is invoked _once_ for each of these events:
 
 **Note:** _once_ means once per `feed()` — every time you feed new data, it allows the plugin to trigger another low-buffer or zero event.
 
-> 🧠 **Why event-based feeding?** You might wonder why `flutter_pcm_sound` doesn’t just use a timer to request more samples every few milliseconds like every other audio library. The problem is asynchronous timing. Whether the timer runs on the Dart or native side, your feed callbacks get bunched up behind Dart UI work, leading to audio delays, pops, & excess work, and means it's not really a reliable "timer". Event-based better reflects the reality of Dart timing, and is more efficient.
+> 🧠 **Why event-based feeding?** You might wonder why `flutter_pcm_sound` doesn’t just use a timer to request more samples every few milliseconds like every other audio library. The problem is asynchronous timing. Whether the timer runs on the Dart or native side, your feed callbacks get bunched up behind Dart UI work, leading to audio delays, pops, & excess work, and means it's not really a reliable "timer". Event-based better reflects the reality of Dart timing without requiring an isolate, and is more efficient.
 
-> 💡 **Tip:** You can still emulate timer-style feeding by setting a very large feed threshold so that `flutter_pcm_sound` calls your feed callback regularly. From there, you can also optionally run a Dart-side `Timer.periodic(...)` or `Ticker` and estimate `remainingFrames`  from your last callback + the elapsed time since it fired.
+> 💡 **Tip:** You can still emulate timer-style feeding by setting a very large feed threshold so that `flutter_pcm_sound` calls your feed callback regularly. From there, you can also optionally run a Dart-side `Timer.periodic(...)` or `Ticker` and estimate `remainingFrames`  from your last callback + the elapsed time since it fired. You should also consider running this in a Dart `Isolate`.
 
 ## One-Pedal Driving
 
@@ -45,7 +45,7 @@ To play audio, just keep calling `feed`.
 
 To stop audio, just stop calling `feed`.
 
-> 🧠 **Why no start & stop functions?**  In Flutter, every call that touches the native side happens asynchronously. If playback depended on `await start()` and `await stop()`, you’d always have to deal with timing jitter between Dart and native while also trying to stream in real-time. Instead, `flutter_pcm_sound` takes a simpler approach: `feed()` does everything. Feeding immediately begins playback if needed and seamlessly continues until the buffer is empty — i.e. when the feed callback is invoked with `remainingFrames = 0`. If you really want a `stop()` function, you can easily wrap `flutter_pcm_sound` so that `feed()` becomes a no-op while “stopped.” This library is designed to be extended and built upon.
+> 🧠 **Why no start & stop functions?**  In Flutter, every call that touches the native side happens asynchronously. If playback depended on `await start()` and `await stop()`, you’d always have to deal with timing jitter between Dart and native while adding additional, needless delay. Instead, `flutter_pcm_sound` takes a simpler approach: `feed()` does everything. Feeding immediately begins playback if needed and seamlessly continues until the buffer is empty — i.e. until the feed callback is invoked with `remainingFrames = 0`. If you really want a `stop()` function, you can easily wrap `flutter_pcm_sound` so that `feed()` becomes a no-op while “stopped.” This library is designed to be extended and built upon.
 
 ## Is Playing?
 
