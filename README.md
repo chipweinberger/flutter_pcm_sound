@@ -45,7 +45,7 @@ To play audio, just keep calling `feed`.
 
 To stop audio, just stop calling `feed`.
 
-> 💡 **Tip:** If you prefer a traditional timer-based API with `start()` and `stop()`, I recommend wrapping `flutter_pcm_sound` as described in the [Event-Based Feeding](#event-based-feeding) tips.
+> 💡 **Tip:** If you prefer a traditional timer-based API with `start()` and `stop()`, I recommend wrapping `flutter_pcm_sound` as described in the [Event Based Feeding](#event-based-feeding) tips.
 
 ## Is Playing?
 
