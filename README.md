@@ -35,9 +35,9 @@ Your feed callback is invoked _once_ for each of these events:
 
 > 💡 **Tip:**  By altering how many extra samples you `feed` beyond your threshold, you can control how often `flutter_pcm_sound` invokes your feed callback.
 
-> 💡 **Tip:** If you prefer, it's easy to wrap `flutter_pcm_sound` to simulate traditional timer-based feeding. 1) set a large feed threshold so that `flutter_pcm_sound` regularly tells you its `remainingFrames` 2) start a Dart-side `Timer.periodic(...)` or `Ticker` 3) use that timer to invoke a new feed callback and pass it the `remainingFrames` minus the elapsed time since the original callback.
+> 💡 **Tip:** If you prefer, it's easy to wrap `flutter_pcm_sound` to simulate traditional timer-based feeding. 1) set a large feed threshold so that `flutter_pcm_sound` regularly tells you its `remainingFrames` 2) start a Dart-side `Timer.periodic(...)` or `Ticker` 3) use that timer to invoke a new feed callback and pass it the `remainingFrames` minus the elapsed time since the original callback. See [this example](https://github.com/chipweinberger/flutter_pcm_sound/issues/43#issuecomment-3368369457)
 
-> 💡 **Tip:** Consider running your sound code in a Dart `Isolate`, so that it is decoupled from UI framedrops.
+> 💡 **Tip:** You should still consider running your sound code in a Dart `Isolate`, so that it is decoupled from UI framedrops.
 
 ## One-Pedal Driving
 
