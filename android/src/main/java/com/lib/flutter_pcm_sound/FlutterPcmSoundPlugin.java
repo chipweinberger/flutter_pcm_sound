@@ -48,8 +48,8 @@ public class FlutterPcmSoundPlugin implements
     private boolean mDidSetup = false;
 
     private long mFeedThreshold = 8000;
-    private volatile boolean mDidInvokeFeedCallback = false;
-    private volatile boolean mDidSendZero = false;
+    private volatile boolean mDidSendLowBufferEvent = false;
+    private volatile boolean mDidSendZeroEvent = false;
 
     // Thread-safe queue for storing audio samples
     private final LinkedBlockingQueue<ByteBuffer> mSamples = new LinkedBlockingQueue<>();
@@ -140,8 +140,8 @@ public class FlutterPcmSoundPlugin implements
 
                     // reset
                     mSamples.clear();
-                    mDidInvokeFeedCallback = false;
-                    mDidSendZero = false;
+                    mDidSendLowBufferEvent = false;
+                    mDidSendZeroEvent = false;
                     mShouldCleanup = false;
 
                     // start playback thread
@@ -165,8 +165,8 @@ public class FlutterPcmSoundPlugin implements
                     byte[] buffer = call.argument("buffer");
 
                     // reset flags
-                    mDidInvokeFeedCallback = false;
-                    mDidSendZero = false;
+                    mDidSendLowBufferEvent = false;
+                    mDidSendZeroEvent = false;
 
                     // Split for better performance
                     List<ByteBuffer> chunks = split(buffer, MAX_FRAMES_PER_BUFFER);
@@ -268,11 +268,11 @@ public class FlutterPcmSoundPlugin implements
             mAudioTrack.write(data, data.remaining(), AudioTrack.WRITE_BLOCKING);
 
             long remaining = mRemainingFrames();
-            boolean isThresholdEvent = remaining <= mFeedThreshold && !mDidInvokeFeedCallback;
-            boolean isZeroCrossingEvent = mDidSendZero == false && remaining == 0;
+            boolean isThresholdEvent = remaining <= mFeedThreshold && !mDidSendLowBufferEvent;
+            boolean isZeroCrossingEvent = mDidSendZeroEvent == false && remaining == 0;
             if (isThresholdEvent || isZeroCrossingEvent) {
-                mDidInvokeFeedCallback = true;
-                mDidSendZero = remaining == 0;
+                mDidSendLowBufferEvent = true;
+                mDidSendZeroEvent = remaining == 0;
                 mainThreadHandler.post(this::invokeFeedCallback);
             }
         }

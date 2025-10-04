@@ -23,8 +23,8 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 @property(nonatomic) NSMutableData *mSamples;
 @property(nonatomic) int mNumChannels; 
 @property(nonatomic) int mFeedThreshold; 
-@property(nonatomic) bool mDidInvokeFeedCallback; 
-@property(nonatomic) bool mDidSendZero;
+@property(nonatomic) bool mDidSendLowBufferEvent; 
+@property(nonatomic) bool mDidSendZeroEvent;
 @property(nonatomic) bool mDidSetup;
 @property(nonatomic) BOOL mIsAppActive;
 @property(nonatomic) BOOL mAllowBackgroundAudio;
@@ -42,8 +42,8 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
     instance.mLogLevel = verbose;
     instance.mSamples = [NSMutableData new];
     instance.mFeedThreshold = 8000;
-    instance.mDidInvokeFeedCallback = false;
-    instance.mDidSendZero = false;
+    instance.mDidSendLowBufferEvent = false;
+    instance.mDidSendZeroEvent = false;
     instance.mDidSetup = false;
     instance.mIsAppActive = true;
     instance.mAllowBackgroundAudio = false;
@@ -233,8 +233,8 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
             }
 
             // reset
-            self.mDidInvokeFeedCallback = false;
-            self.mDidSendZero = false;
+            self.mDidSendLowBufferEvent = false;
+            self.mDidSendZeroEvent = false;
 
             // start
             OSStatus status = AudioOutputUnitStart(_mAudioUnit);
@@ -342,7 +342,7 @@ static OSStatus RenderCallback(void *inRefCon,
         remainingFrames = [instance.mSamples length] / (instance.mNumChannels * sizeof(short));
 
         // should request more frames?
-        isThresholdEvent = remainingFrames <= instance.mFeedThreshold && !instance.mDidInvokeFeedCallback;
+        isThresholdEvent = remainingFrames <= instance.mFeedThreshold && !instance.mDidSendLowBufferEvent;
     }
 
     // stop running, if needed
@@ -352,11 +352,11 @@ static OSStatus RenderCallback(void *inRefCon,
         });
     }
 
-    BOOL isZeroCrossingEvent = instance.mDidSendZero == false && remainingFrames == 0;
+    BOOL isZeroCrossingEvent = instance.mDidSendZeroEvent == false && remainingFrames == 0;
 
     if (isThresholdEvent || isZeroCrossingEvent) { 
-        instance.mDidInvokeFeedCallback = true;
-        instance.mDidSendZero = remainingFrames == 0;
+        instance.mDidSendLowBufferEvent = true;
+        instance.mDidSendZeroEvent = remainingFrames == 0;
         NSDictionary *response = @{@"remaining_frames": @(remainingFrames)};
         dispatch_async(dispatch_get_main_queue(), ^{
             [instance.mMethodChannel invokeMethod:@"OnFeedSamples" arguments:response];
