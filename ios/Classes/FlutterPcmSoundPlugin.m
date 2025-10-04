@@ -6,7 +6,7 @@
 #endif
 
 #define kOutputBus 0
-#define NAMESPACE @"flutter_pcm_sound" // Assuming this is the namespace you want
+#define NAMESPACE @"flutter_pcm_sound"
 
 typedef NS_ENUM(NSUInteger, LogLevel) {
     none = 0,
@@ -23,8 +23,9 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 @property(nonatomic) NSMutableData *mSamples;
 @property(nonatomic) int mNumChannels; 
 @property(nonatomic) int mFeedThreshold; 
-@property(nonatomic) bool mDidSendLowBufferEvent; 
-@property(nonatomic) bool mDidSendZeroEvent;
+@property(nonatomic) NSUInteger mTotalFeeds;
+@property(nonatomic) NSUInteger mLastLowBufferFeed;
+@property(nonatomic) NSUInteger mLastZeroFeed;
 @property(nonatomic) bool mDidSetup;
 @property(nonatomic) BOOL mIsAppActive;
 @property(nonatomic) BOOL mAllowBackgroundAudio;
@@ -42,8 +43,9 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
     instance.mLogLevel = verbose;
     instance.mSamples = [NSMutableData new];
     instance.mFeedThreshold = 8000;
-    instance.mDidSendLowBufferEvent = false;
-    instance.mDidSendZeroEvent = false;
+    instance.mTotalFeeds = 0;
+    instance.mLastLowBufferFeed = 0;
+    instance.mLastZeroFeed = 0;
     instance.mDidSetup = false;
     instance.mIsAppActive = true;
     instance.mAllowBackgroundAudio = false;
@@ -230,11 +232,8 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 
             @synchronized (self.mSamples) {
                 [self.mSamples appendData:buffer.data];
+                self.mTotalFeeds += 1;
             }
-
-            // reset
-            self.mDidSendLowBufferEvent = false;
-            self.mDidSendZeroEvent = false;
 
             // start
             OSStatus status = AudioOutputUnitStart(_mAudioUnit);
@@ -282,7 +281,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
         self.mDidSetup = false;
     }
     @synchronized (self.mSamples) {
-        self.mSamples = [NSMutableData new]; 
+        [self.mSamples setLength:0];
     }
 }
 
@@ -322,8 +321,8 @@ static OSStatus RenderCallback(void *inRefCon,
 {
     FlutterPcmSoundPlugin *instance = (__bridge FlutterPcmSoundPlugin *)(inRefCon);
 
+    NSUInteger totalFeeds = 0;
     NSUInteger remainingFrames;
-    BOOL isThresholdEvent = false;
 
     @synchronized (instance.mSamples) {
 
@@ -339,11 +338,14 @@ static OSStatus RenderCallback(void *inRefCon,
         NSRange range = NSMakeRange(0, bytesToCopy);
         [instance.mSamples replaceBytesInRange:range withBytes:NULL length:0];
 
+        // grab shared data
         remainingFrames = [instance.mSamples length] / (instance.mNumChannels * sizeof(short));
-
-        // should request more frames?
-        isThresholdEvent = remainingFrames <= instance.mFeedThreshold && !instance.mDidSendLowBufferEvent;
+        totalFeeds = instance.mTotalFeeds;
     }
+
+    // check for events
+    BOOL isLowBufferEvent = (remainingFrames <= instance.mFeedThreshold) && (instance.mLastLowBufferFeed != totalFeeds);
+    BOOL isZeroCrossingEvent = (remainingFrames == 0) && (instance.mLastZeroFeed != totalFeeds);
 
     // stop running, if needed
     if (remainingFrames == 0) {
@@ -352,11 +354,10 @@ static OSStatus RenderCallback(void *inRefCon,
         });
     }
 
-    BOOL isZeroCrossingEvent = instance.mDidSendZeroEvent == false && remainingFrames == 0;
-
-    if (isThresholdEvent || isZeroCrossingEvent) { 
-        instance.mDidSendLowBufferEvent = true;
-        instance.mDidSendZeroEvent = remainingFrames == 0;
+    // send events
+    if (isLowBufferEvent || isZeroCrossingEvent) {
+        if(isLowBufferEvent) {instance.mLastLowBufferFeed = totalFeeds;}
+        if(isZeroCrossingEvent) {instance.mLastZeroFeed = totalFeeds;}
         NSDictionary *response = @{@"remaining_frames": @(remainingFrames)};
         dispatch_async(dispatch_get_main_queue(), ^{
             [instance.mMethodChannel invokeMethod:@"OnFeedSamples" arguments:response];

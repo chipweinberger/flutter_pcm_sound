@@ -48,8 +48,9 @@ public class FlutterPcmSoundPlugin implements
     private boolean mDidSetup = false;
 
     private long mFeedThreshold = 8000;
-    private volatile boolean mDidSendLowBufferEvent = false;
-    private volatile boolean mDidSendZeroEvent = false;
+    private long mTotalFeeds = 0;
+    private long mLastLowBufferFeed = 0;
+    private long mLastZeroFeed = 0;
 
     // Thread-safe queue for storing audio samples
     private final LinkedBlockingQueue<ByteBuffer> mSamples = new LinkedBlockingQueue<>();
@@ -140,8 +141,6 @@ public class FlutterPcmSoundPlugin implements
 
                     // reset
                     mSamples.clear();
-                    mDidSendLowBufferEvent = false;
-                    mDidSendZeroEvent = false;
                     mShouldCleanup = false;
 
                     // start playback thread
@@ -164,16 +163,15 @@ public class FlutterPcmSoundPlugin implements
 
                     byte[] buffer = call.argument("buffer");
 
-                    // reset flags
-                    mDidSendLowBufferEvent = false;
-                    mDidSendZeroEvent = false;
-
                     // Split for better performance
                     List<ByteBuffer> chunks = split(buffer, MAX_FRAMES_PER_BUFFER);
 
-                    // Push to mSamples
-                    for (ByteBuffer chunk : chunks) {
-                        mSamples.put(chunk);
+                    // Push samples
+                    synchronized (mSamples) {
+                        for (ByteBuffer chunk : chunks) {
+                            mSamples.add(chunk);
+                        }
+                        mTotalFeeds += 1;
                     }
 
                     result.success(true);
@@ -205,7 +203,6 @@ public class FlutterPcmSoundPlugin implements
         }
     }
 
-
     /**
      * Cleans up resources by stopping the playback thread and releasing AudioTrack.
      */
@@ -225,26 +222,13 @@ public class FlutterPcmSoundPlugin implements
     }
 
     /**
-     * Calculates the number of remaining frames in the sample buffer.
-     */
-    private long mRemainingFrames() {
-        long totalBytes = 0;
-        for (ByteBuffer sampleBuffer : mSamples) {
-            totalBytes += sampleBuffer.remaining();
-        }
-        return totalBytes / (2 * mNumChannels); // 16-bit PCM
-    }
-
-    /**
      * Invokes the 'OnFeedSamples' callback with the number of remaining frames.
      */
-    private void invokeFeedCallback() {
-        long remainingFrames = mRemainingFrames();
+    private void invokeFeedCallback(long remainingFrames) {
         Map<String, Object> response = new HashMap<>();
         response.put("remaining_frames", remainingFrames);
         mMethodChannel.invokeMethod("OnFeedSamples", response);
     }
-
 
     /**
      * The main loop of the playback thread.
@@ -267,13 +251,28 @@ public class FlutterPcmSoundPlugin implements
             // write
             mAudioTrack.write(data, data.remaining(), AudioTrack.WRITE_BLOCKING);
 
-            long remaining = mRemainingFrames();
-            boolean isThresholdEvent = remaining <= mFeedThreshold && !mDidSendLowBufferEvent;
-            boolean isZeroCrossingEvent = mDidSendZeroEvent == false && remaining == 0;
-            if (isThresholdEvent || isZeroCrossingEvent) {
-                mDidSendLowBufferEvent = true;
-                mDidSendZeroEvent = remaining == 0;
-                mainThreadHandler.post(this::invokeFeedCallback);
+            long remainingFrames;
+            long totalFeeds;
+
+            // grab shared data
+            synchronized (mSamples) {
+                long totalBytes = 0;
+                for (ByteBuffer sampleBuffer : mSamples) {
+                    totalBytes += sampleBuffer.remaining();
+                }
+                remainingFrames = totalBytes / (2 * mNumChannels);
+                totalFeeds = mTotalFeeds;
+            }
+
+            // check for events
+            boolean isLowBufferEvent = (remainingFrames <= mFeedThreshold) && (mLastLowBufferFeed != totalFeeds);
+            boolean isZeroCrossingEvent = (remainingFrames == 0) && (mLastZeroFeed != totalFeeds);
+
+            // send events
+            if (isLowBufferEvent || isZeroCrossingEvent) {
+                if (isLowBufferEvent) {mLastLowBufferFeed = totalFeeds;}
+                if (isZeroCrossingEvent) {mLastZeroFeed = totalFeeds;}
+                mainThreadHandler.post(() -> invokeFeedCallback(remainingFrames));
             }
         }
 
