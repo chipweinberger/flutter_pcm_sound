@@ -1,3 +1,6 @@
+## 3.3.0
+* **[Fix]** race conditions that could theoretically cause `OnFeedSamples` to misfire
+
 ## 3.2.6
 * **[Docs]** more docs clarifications
 
