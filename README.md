@@ -45,7 +45,7 @@ To play audio, just keep calling `feed`.
 
 To stop audio, just stop calling `feed`.
 
-> 💡 **How to think about it:** In a traditional sound library you’d call `start()`, which begins invoking your feed callback, and later call `stop()` to end it. `flutter_pcm_sound` works almost the same way — you can still call the `start()` convenience function if you want. The difference is that you don’t need an explicit `stop()`: if you stop feeding samples, `flutter_pcm_sound` will naturally stop invoking your feed callback once the buffer runs out. When that happens, your callback will see `remainingFrames = 0`, which indicates playback has ended. This is conserves power and CPU performance.
+> 🧠 **Why no start & stop functions?**  In Flutter, every call that touches the native side happens asynchronously. If playback depended on `await start()` and `await stop()`, you’d always have to deal with timing jitter between Dart and native while also trying to stream in real-time. Instead, `flutter_pcm_sound` takes a simpler approach: `feed()` does everything. Feeding immediately begins playback if needed and seamlessly continues until the buffer is empty — i.e. when the feed callback is invoked with `remainingFrames = 0`. If you really want a `stop()` function, you can easily wrap `flutter_pcm_sound` so that `feed()` becomes a no-op while “stopped.” This library is designed to be extended and built upon.
 
 ## Is Playing?
 
