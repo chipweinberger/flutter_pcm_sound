@@ -45,7 +45,7 @@ If you prefer, it's easy to wrap `flutter_pcm_sound` to simulate traditional tim
  
  2) Start a Dart-side `Timer.periodic(...)` or `Ticker` 
  
- 3) On each timer tick, call your feed callback an estimated remaining frames. i.e. `estimatedRemainingFrames = remainingFrames - (elapsedSeconds * sampleRate)`
+ 3) On each timer tick, call your feed callback with the estimated remaining frames. i.e. `estimatedRemainingFrames = remainingFrames - (elapsedSeconds * sampleRate)`
  
  <details>
 <summary> For an example, click here</summary>
