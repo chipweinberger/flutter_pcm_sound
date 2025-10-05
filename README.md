@@ -94,7 +94,7 @@ class FlutterPcmTimer {
       iosAllowBackgroundAudio: iosAllowBackgroundAudio,
     );
 
-    // Huge threshold → plugin periodically reports remainingFrames.
+    // Huge threshold → plugin regularly reports `remainingFrames`.
     await FlutterPcmSound.setFeedThreshold(_sampleRate * 60 * 60 * 24 * 365);
 
     FlutterPcmSound.setFeedCallback((remaining) {
@@ -108,11 +108,10 @@ class FlutterPcmTimer {
 
     _isSetup = true;
   }
-
   
   static void setFeedCallback(FeedCallback? cb) => _onFeed = cb;
 
-  static Future<void> start() {
+  static void start() {
     if (!_isSetup) throw StateError('Call SoundTimer.setup(...) first.');
     if (_playing) return;
 
@@ -123,8 +122,7 @@ class FlutterPcmTimer {
     _timer ??= Timer.periodic(period, (_) => _tick());
   }
 
-  /// Stop. Guarantees no further feed() calls after this returns.
-  static Future<void> stop() {
+  static void stop() {
     if (!_playing && _timer == null) return;
     _playing = false;
     _timer?.cancel();
