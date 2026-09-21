@@ -277,6 +277,16 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 - (void)cleanup
 {
     if (_mAudioUnit != nil) {
+        // Unregister before Stop/Dispose. AURemoteIO::IOThread can still enter
+        // RenderCallback after Dispose; inRefCon is then garbage → EXC_BAD_ACCESS
+        // objc_retain (https://github.com/chipweinberger/flutter_pcm_sound/issues/46).
+        AURenderCallbackStruct callback = {0};
+        AudioUnitSetProperty(_mAudioUnit,
+                            kAudioUnitProperty_SetRenderCallback,
+                            kAudioUnitScope_Global,
+                            kOutputBus,
+                            &callback,
+                            sizeof(callback));
         AudioOutputUnitStop(_mAudioUnit);
         AudioUnitUninitialize(_mAudioUnit);
         AudioComponentInstanceDispose(_mAudioUnit);
