@@ -11,8 +11,8 @@ Pod::Spec.new do |s|
   s.license          = { :file => '../LICENSE' }
   s.author           = { 'Chip Weinberger' => 'weinbergerc@gmail.com' }
   s.source           = { :path => '.' }
-  s.source_files = 'Classes/**/*'
-  s.public_header_files = 'Classes/**/*.h'
+  s.source_files = 'flutter_pcm_sound/Sources/flutter_pcm_sound/**/*.{h,m}'
+  s.public_header_files = 'flutter_pcm_sound/Sources/flutter_pcm_sound/include/**/*.h'
   s.dependency 'Flutter'
   s.platform = :ios, '9.0'
   s.framework = 'CoreAudio'
