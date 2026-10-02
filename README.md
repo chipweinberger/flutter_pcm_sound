@@ -1,3 +1,5 @@
+## NO LONGER MAINTAINED!
+
 [![pub package](https://img.shields.io/pub/v/flutter_pcm_sound.svg)](https://pub.dartlang.org/packages/flutter_pcm_sound)
 
 <p align="center">
