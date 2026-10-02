@@ -1,4 +1,4 @@
-## NO LONGER MAINTAINED!
+## Update: NO LONGER MAINTAINED!
 
 [![pub package](https://img.shields.io/pub/v/flutter_pcm_sound.svg)](https://pub.dartlang.org/packages/flutter_pcm_sound)
 
